@@ -1,0 +1,320 @@
+{
+    "apiVersion": "v1",
+    "kind": "Node",
+    "metadata": {
+        "annotations": {
+            "kubeadm.alpha.kubernetes.io/cri-socket": "/var/run/dockershim.sock",
+            "node.alpha.kubernetes.io/ttl": "0",
+            "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+        },
+        "creationTimestamp": "2019-04-10T23:01:10Z",
+        "labels": {
+            "beta.kubernetes.io/arch": "amd64",
+            "beta.kubernetes.io/os": "linux",
+            "kubernetes.io/arch": "amd64",
+            "kubernetes.io/hostname": "minikube",
+            "kubernetes.io/os": "linux",
+            "node-role.kubernetes.io/master": "",
+            "app": "A"
+        },
+        "name": "minikube",
+        "resourceVersion": "606105",
+        "selfLink": "/api/v1/nodes/minikube",
+        "uid": "883126f4-5be4-11e9-a349-00155de36603"
+    },
+    "spec": {},
+    "status": {
+        "addresses": [
+            {
+                "address": "172.18.76.185",
+                "type": "InternalIP"
+            },
+            {
+                "address": "minikube",
+                "type": "Hostname"
+            }
+        ],
+        "allocatable": {
+            "cpu": "6",
+            "ephemeral-storage": "16390445849",
+            "hugepages-2Mi": "0",
+            "memory": "1925036Ki",
+            "pods": "110"
+        },
+        "capacity": {
+            "cpu": "6",
+            "ephemeral-storage": "17784772Ki",
+            "hugepages-2Mi": "0",
+            "memory": "2027436Ki",
+            "pods": "110"
+        },
+        "conditions": [
+            {
+                "lastHeartbeatTime": "2019-06-04T14:54:52Z",
+                "lastTransitionTime": "2019-04-10T23:01:08Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+            },
+            {
+                "lastHeartbeatTime": "2019-06-04T14:54:52Z",
+                "lastTransitionTime": "2019-06-03T13:37:54Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+            },
+            {
+                "lastHeartbeatTime": "2019-06-04T14:54:52Z",
+                "lastTransitionTime": "2019-04-10T23:01:08Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+            },
+            {
+                "lastHeartbeatTime": "2019-06-04T14:54:52Z",
+                "lastTransitionTime": "2019-04-10T23:01:08Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+            }
+        ],
+        "daemonEndpoints": {
+            "kubeletEndpoint": {
+                "Port": 10250
+            }
+        },
+        "images": [
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 1275196801
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 1110315959
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 1059660449
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 1000243764
+            },
+            {
+                "names": [
+                    "golang@sha256:cf0b9f69ad1edd652a7f74a1586080b15bf6f688c545044407e28805066ef2cb",
+                    "golang:latest"
+                ],
+                "sizeBytes": 773940455
+            },
+            {
+                "names": [
+                    "kappnav-ui:latest"
+                ],
+                "sizeBytes": 749040894
+            },
+            {
+                "names": [
+                    "node@sha256:3422df4f7532b26b55275ad7b6dc17ec35f77192b04ce22e62e43541f3d28eb3",
+                    "node:8.11.4"
+                ],
+                "sizeBytes": 672530886
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 661962513
+            },
+            {
+                "names": [
+                    "kappnav-was-controller:latest"
+                ],
+                "sizeBytes": 607787757
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 604255500
+            },
+            {
+                "names": [
+                    "kappnav-apis:latest"
+                ],
+                "sizeBytes": 569810078
+            },
+            {
+                "names": [
+                    "registry.access.redhat.com/ubi7/nodejs-8@sha256:4e0ad9b63818841c57afca652f4664b74ebdf3b8f1d3ef8dc5323ba34497a5f0",
+                    "registry.access.redhat.com/ubi7/nodejs-8:1-47"
+                ],
+                "sizeBytes": 541406886
+            },
+            {
+                "names": [
+                    "open-liberty@sha256:87032a67ceb8397602771f8e6b93fb3d4777d1eea8e76057d6da56ed1e78532b",
+                    "open-liberty:latest"
+                ],
+                "sizeBytes": 537298169
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/etcd@sha256:17da501f5d2a675be46040422a27b7cc21b8a43895ac998b171db1c346f361f7",
+                    "k8s.gcr.io/etcd:3.3.10"
+                ],
+                "sizeBytes": 258116302
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kube-apiserver@sha256:5a5183b427e2e4226a3a7411064ee1b9dae5199513f2d7569b5e264a7be0fd06",
+                    "k8s.gcr.io/kube-apiserver:v1.14.0"
+                ],
+                "sizeBytes": 209787945
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kube-controller-manager@sha256:433e56decf088553bdbe055610712dc1192453b2265376eea9af4aab9f574b54",
+                    "k8s.gcr.io/kube-controller-manager:v1.14.0"
+                ],
+                "sizeBytes": 157821161
+            },
+            {
+                "names": [
+                    "kappnav-init:latest"
+                ],
+                "sizeBytes": 135916078
+            },
+            {
+                "names": [
+                    "kappnav-controller:latest"
+                ],
+                "sizeBytes": 130027271
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.1"
+                ],
+                "sizeBytes": 121711221
+            },
+            {
+                "names": [
+                    "nginx@sha256:23b4dcdf0d34d4a129755fc6f52e1c6e23bb34ea011b315d87e193033bcd1b68",
+                    "nginx:latest"
+                ],
+                "sizeBytes": 109331233
+            },
+            {
+                "names": [
+                    "\u003cnone\u003e@\u003cnone\u003e",
+                    "\u003cnone\u003e:\u003cnone\u003e"
+                ],
+                "sizeBytes": 88910956
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kube-addon-manager:v9.0"
+                ],
+                "sizeBytes": 83077558
+            },
+            {
+                "names": [
+                    "gcr.io/kubernetes-helm/tiller@sha256:d52b34a9f9aeec1cf74155ca51fcbb5d872a705914565c782be4531790a4ee0e",
+                    "gcr.io/kubernetes-helm/tiller:v2.13.1"
+                ],
+                "sizeBytes": 82105090
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kube-proxy@sha256:bd414b838473ee9b704ac2c5756cc3d1e536df7daaac26058909a4bdd42a1e89",
+                    "k8s.gcr.io/kube-proxy:v1.14.0"
+                ],
+                "sizeBytes": 82104359
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/kube-scheduler@sha256:cb35b2580cd0d97984106a81dcd0f1d9f63d774e18eeae40caef88d217f36b82",
+                    "k8s.gcr.io/kube-scheduler:v1.14.0"
+                ],
+                "sizeBytes": 81577865
+            },
+            {
+                "names": [
+                    "registry.access.redhat.com/ubi7-minimal@sha256:9e2cec104a77b76e6c343f67bd058005dc64d573fccf339c24cf79013ff8e7f3",
+                    "registry.access.redhat.com/ubi7/ubi-minimal@sha256:9e2cec104a77b76e6c343f67bd058005dc64d573fccf339c24cf79013ff8e7f3",
+                    "registry.access.redhat.com/ubi7-minimal:7.6-123",
+                    "registry.access.redhat.com/ubi7/ubi-minimal:latest"
+                ],
+                "sizeBytes": 81261449
+            },
+            {
+                "names": [
+                    "gcr.io/k8s-minikube/storage-provisioner:v1.8.1"
+                ],
+                "sizeBytes": 80815640
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.13"
+                ],
+                "sizeBytes": 51157394
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.13"
+                ],
+                "sizeBytes": 42852039
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.13"
+                ],
+                "sizeBytes": 41372492
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/coredns@sha256:02382353821b12c21b062c59184e227e001079bb13ebd01f9d3270ba0fcbf1e4",
+                    "k8s.gcr.io/coredns:1.3.1"
+                ],
+                "sizeBytes": 40303560
+            },
+            {
+                "names": [
+                    "k8s.gcr.io/pause@sha256:f78411e19d84a252e53bff71a4407a5686c46983a2c2eeed83929b888179acea",
+                    "k8s.gcr.io/pause:3.1"
+                ],
+                "sizeBytes": 742472
+            }
+        ],
+        "nodeInfo": {
+            "architecture": "amd64",
+            "bootID": "2659fd1d-2ff6-4497-a59b-f433ba3f91d2",
+            "containerRuntimeVersion": "docker://18.6.2",
+            "kernelVersion": "4.15.0",
+            "kubeProxyVersion": "v1.14.0",
+            "kubeletVersion": "v1.14.0",
+            "machineID": "79cf921e3fad4892aab13bc0bb03c3f3",
+            "operatingSystem": "linux",
+            "osImage": "Buildroot 2018.05",
+            "systemUUID": "FA66E740-9962-D249-8FB4-A47CB301D644"
+        }
+    }
+}

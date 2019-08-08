@@ -1,0 +1,51 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {
+        "annotations": {
+            "kappnav.app.auto-created.from.kind": "Deployment",
+            "kappnav.app.auto-created.from.name": "auto2"
+        },
+        "creationTimestamp": "2019-05-23T17:48:11Z",
+        "generation": 1,
+        "labels": {
+            "app.kubernetes.io/name": "auto2-app",
+            "app.kubernetes.io/version": "2.2",
+            "my-app": "auto2-app",
+            "kappnav.app.auto-created": "true"
+        },
+        "name": "auto2-app",
+        "namespace": "default",
+        "resourceVersion": "453182",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto2-app",
+        "uid": "eeb23f4e-7d82-11e9-8623-00155de36603"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "App",
+                "kind": "Deployment"
+            },
+            {
+                "group": "App",
+                "kind": "Service"
+            },
+            {
+                "group": "App",
+                "kind": "Ingress"
+            }
+        ],
+        "selector": {
+            "matchExpressions": [
+                {
+                    "key": "my-app",
+                    "operator": "In",
+                    "values": [
+                        "auto2-app",
+                        "other-app"
+                    ]
+                }
+            ]
+        }
+    }
+}

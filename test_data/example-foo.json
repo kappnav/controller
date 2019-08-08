@@ -1,0 +1,23 @@
+{
+    "apiVersion": "samplecontroller.k8s.io/v1alpha1",
+    "kind": "Foo",
+    "metadata": {
+        "annotations": {
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"samplecontroller.k8s.io/v1alpha1\",\"kind\":\"Foo\",\"metadata\":{\"annotations\":{},\"name\":\"example-foo\",\"namespace\":\"default\"},\"spec\":{\"deploymentName\":\"example-foo\",\"replicas\":1}}\n"
+        },
+        "creationTimestamp": "2019-02-27T20:32:56Z",
+        "labels": {
+            "app": "foo-app"
+        },
+        "generation": 1,
+        "name": "example-foo",
+        "namespace": "default",
+        "resourceVersion": "1190524",
+        "selfLink": "/apis/samplecontroller.k8s.io/v1alpha1/namespaces/default/foos/example-foo",
+        "uid": "dd51fd27-3ace-11e9-85e8-0800275638b6"
+    },
+    "spec": {
+        "deploymentName": "example-foo",
+        "replicas": 1
+    }
+}

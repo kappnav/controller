@@ -1,0 +1,36 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {
+        "annotations": {
+            "kappnav.app.auto-created.from.kind": "Deployment",
+            "kappnav.app.auto-created.from.name": "auto3"
+        },
+        "creationTimestamp": "2019-05-23T18:00:47Z",
+        "generation": 1,
+        "labels": {
+            "app": "auto3-app",
+            "app.kubernetes.io/name": "auto3-app",
+            "app.kubernetes.io/version": "2",
+            "kappnav.app.auto-created": "true"
+        },
+        "name": "auto3-app",
+        "namespace": "default",
+        "resourceVersion": "454164",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto3",
+        "uid": "b1081ebf-7d84-11e9-8623-00155de36603"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "App",
+                "kind": "Deployment"
+            }
+        ],
+        "selector": {
+            "matchLabels": {
+                "app": "auto3-app"
+            }
+        }
+    }
+}

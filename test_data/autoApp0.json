@@ -1,0 +1,52 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {
+        "annotations": {
+            "kappnav.app.auto-created.from.kind": "Deployment",
+            "kappnav.app.auto-created.from.name": "auto0"
+        },
+        "creationTimestamp": "2019-05-23T17:38:03Z",
+        "generation": 1,
+        "labels": {
+            "app": "auto0",
+            "app.kubernetes.io/name": "auto0",
+            "app.kubernetes.io/version": "1.0.0",
+            "kappnav.app.auto-created": "true"
+        },
+        "name": "auto0",
+        "namespace": "default",
+        "resourceVersion": "452387",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto0",
+        "uid": "846b645c-7d81-11e9-8623-00155de36603"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "App",
+                "kind": "Deployment"
+            },
+            {
+                "group": "App",
+                "kind": "StatefulSet"
+            },
+            {
+                "group": "App",
+                "kind": "Service"
+            },
+            {
+                "group": "App",
+                "kind": "Ingress"
+            },
+            {
+                "group": "App",
+                "kind": "Configmap"
+            }
+        ],
+        "selector": {
+            "matchLabels": {
+                "app": "auto0"
+            }
+        }
+    }
+}

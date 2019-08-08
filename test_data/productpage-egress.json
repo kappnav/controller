@@ -1,0 +1,72 @@
+{
+    "apiVersion": "extensions/v1beta1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+        "creationTimestamp": "2019-02-19T19:32:09Z",
+        "generation": 1,
+        "labels": {
+            "app": "bookinfo"
+        },
+        "name": "productpage-egress",
+        "namespace": "default",
+        "resourceVersion": "1007598",
+        "selfLink": "/apis/extensions/v1beta1/namespaces/default/networkpolicies/productpage-egress",
+        "uid": "0c881103-347d-11e9-9d73-0800275638b6"
+    },
+    "spec": {
+        "egress": [
+            {
+                "to": [
+                    {
+                        "namespaceSelector": {
+                            "matchLabels": {
+                                "kube-system": "ns"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "to": [
+                    {
+                        "namespaceSelector": {
+                            "matchLabels": {
+                                "istio-system": "ns"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "to": [
+                    {
+                        "podSelector": {
+                            "matchLabels": {
+                                "app": "details"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "to": [
+                    {
+                        "podSelector": {
+                            "matchLabels": {
+                                "app": "reviews"
+                            }
+                        }
+                    }
+                ]
+            }
+        ],
+        "podSelector": {
+            "matchLabels": {
+                "app": "productpage"
+            }
+        },
+        "policyTypes": [
+            "Egress"
+        ]
+    }
+}

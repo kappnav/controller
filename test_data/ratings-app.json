@@ -1,0 +1,37 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {
+        "creationTimestamp": "2019-02-19T19:32:09Z",
+        "generation": 1,
+        "labels": {
+            "app": "ratings"
+        },
+        "name": "ratings-app",
+        "namespace": "default",
+        "resourceVersion": "1007586",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/ratings-app",
+        "uid": "0c82fffe-347d-11e9-9d73-0800275638b6"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "core",
+                "kind": "Service"
+            },
+            {
+                "group": "apps",
+                "kind": "Deployment"
+            },
+            {
+                "group": "apps",
+                "kind": "StatefulSet"
+            }
+        ],
+        "selector": {
+            "matchLabels": {
+                "app": "ratings"
+            }
+        }
+    }
+}

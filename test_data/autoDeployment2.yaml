@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kappnav.app.auto-create.name: auto2-app
+    kappnav.app.auto-create.kinds: "Deployment, Service, Ingress"
+    kappnav.app.auto-create.version: "2.2"
+    kappnav.app.auto-create.label: "my-app"
+    kappnav.app.auto-create.labels-values: "auto2-app, other-app"
+  name: auto2
+  labels:
+    my-app: auto2-app
+    kappnav.app.auto-create: "true"
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      my-app: auto2-app
+  template:
+    metadata:
+      labels:
+        my-app: auto2-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80

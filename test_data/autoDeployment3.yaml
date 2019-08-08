@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kappnav.app.auto-create.name: "auto3-app"
+    kappnav.app.auto-create.kinds: "Deployment"
+    kappnav.app.auto-create.version: "2"
+    kappnav.app.auto-create.labels-values: "auto3-app"
+  name: auto3
+  labels:
+    app: auto3-app
+    kappnav.app.auto-create: "true"
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      my-app: auto3-app
+  template:
+    metadata:
+      labels:
+        my-app: auto3-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80

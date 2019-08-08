@@ -1,0 +1,40 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {
+        "annotations": {
+            "kappnav.component.namespaces": "ns2, ns3"
+        },
+        "creationTimestamp": "2019-02-19T19:32:09Z",
+        "generation": 1,
+        "labels": {
+            "app": "A"
+        },
+        "name": "a-app",
+        "namespace": "ns1",
+        "resourceVersion": "1007570",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/A-pp",
+        "uid": "0c78ffd0-347d-11e9-9d73-0800275638b6"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "apps",
+                "kind": "Application"
+            },
+            {
+                "group": "services",
+                "kind": "Service"
+            },
+            {
+                "group": "deployments",
+                "kind": "Deployment"
+            }
+        ],
+        "selector": {
+            "matchLabels": {
+                "app": "A"
+            }
+        }
+    }
+}

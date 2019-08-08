@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: kappnav-config
+  namespace: kappnav
+data:
+    status-color-mapping: |  
+            { "values": { "Red Alert": PURPLE,  "Normal": "GREEN",   "Warning": "YELLOW",  "Problem": "RED",  "Unknown": "GREY"}, 
+              "colors": { "GREEN":  "#5aa700", "YELLOW":  "#B4B017", "RED": "#A74343", "GREY":"#808080", PURPLE: "800080" } 
+            }
+    app-status-precedence: |  
+            [ "Red Alert", "Problem", "Warning", "Unknown", "Normal" ] 
+    status-unknown: "Unknown" 

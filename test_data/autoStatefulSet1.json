@@ -1,0 +1,104 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "StatefulSet",
+    "metadata": {
+        "creationTimestamp": "2019-05-26T05:32:11Z",
+        "generation": 1,
+        "labels": {
+            "app": "autos1",
+            "kappnav.app.auto-create": "true"
+        },
+        "name": "autos1",
+        "namespace": "default",
+        "resourceVersion": "506962",
+        "selfLink": "/apis/apps/v1/namespaces/default/statefulsets/autos1",
+        "uid": "9c50dc49-7f77-11e9-ac5c-00155de36603"
+    },
+    "spec": {
+        "podManagementPolicy": "OrderedReady",
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "app": "autos1"
+            }
+        },
+        "serviceName": "nginx",
+        "template": {
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "app": "autos1"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "nginx:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "nginx",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "name": "web",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/usr/share/nginx/html",
+                                "name": "www"
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 10
+            }
+        },
+        "updateStrategy": {
+            "rollingUpdate": {
+                "partition": 0
+            },
+            "type": "RollingUpdate"
+        },
+        "volumeClaimTemplates": [
+            {
+                "metadata": {
+                    "creationTimestamp": null,
+                    "name": "www"
+                },
+                "spec": {
+                    "accessModes": [
+                        "ReadWriteOnce"
+                    ],
+                    "resources": {
+                        "requests": {
+                            "storage": "1Mi"
+                        }
+                    },
+                    "storageClassName": "my-storage-class",
+                    "volumeMode": "Filesystem"
+                },
+                "status": {
+                    "phase": "Pending"
+                }
+            }
+        ]
+    },
+    "status": {
+        "collisionCount": 0,
+        "currentReplicas": 1,
+        "currentRevision": "autos1-75f755c6f5",
+        "observedGeneration": 1,
+        "replicas": 1,
+        "updateRevision": "autos1-75f755c6f5",
+        "updatedReplicas": 1
+    }
+}
