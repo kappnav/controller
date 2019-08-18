@@ -70,8 +70,6 @@ const (
 	deploymentReviewsV2      = "test_data/reviews-v2.json"
 	deploymentReviewsV3      = "test_data/reviews-v3.json"
 	serviceReview            = "test_data/reviews.json"
-	crdWasNDCell             = "test_data/was-nd-cell.json"
-	crdWasNDApp              = "test_data/websphere-traditional.json"
 	aApp                     = "test_data/A-app.json"
 	bApp                     = "test_data/B-app.json"
 	abApp                    = "test_data/AB-app.json"
@@ -84,8 +82,8 @@ const (
 	cDeployment              = "test_data/C-deployment.json"
 	aService                 = "test_data/A-service.json"
 	bService                 = "test_data/B-service.json"
-	nsListkAppNavConfigMap     = "test_data/ns_list_kappnav_config_map.json"
-	nsNolistkAppNavConfigMap   = "test_data/ns_nolist_kappnav_config_map.json"
+	nsListkAppNavConfigMap   = "test_data/ns_list_kappnav_config_map.json"
+	nsNolistkAppNavConfigMap = "test_data/ns_nolist_kappnav_config_map.json"
 	ns1AnnoApplication       = "test_data/ns1_anno_application.json"
 	ns1App                   = "test_data/NS1-App.json"
 	ns1aApp                  = "test_data/NS1A-App.json"
@@ -171,8 +169,6 @@ func TestPopulateResources(t *testing.T) {
 		deploymentReviewsV2,
 		deploymentReviewsV3,
 		serviceReview,
-		crdWasNDCell,
-		crdWasNDApp,
 		crdFoo,
 		fooExample,
 		appFoo,

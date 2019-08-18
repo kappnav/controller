@@ -64,12 +64,6 @@ store +controller |          |    +queue        |                |   batch
 	 - ApplicationHandler to process kappnav application status changes
 	 - default handler: to process non-application resources that can have
 	   kappnav status.
-  The architecture allows for additional handlers to registered. To be added
-  are:
-	 - WAS cell handler to update WAS cell represnetation and create/delete WAS app represnetations in Kubernetes
-	 - WAS application handlers to create/delete WAS application representations in Kuberetes
-	 - WAS Liberty collective handler to create/delete collective reprresentation in Kubernetes, and Liberty app representation in Kubernetes
-	 - WAS Liberty app handler to update WAS libert app representation in Kubernetes
 
   The client-go library is used to create a Kubernetes controller and cache
   for each kind. A callback handler is registered with client-go library to
@@ -136,12 +130,6 @@ const (
 	defaultkAppNavNamespace    = "kappnav"
 	kappnavConfig              = "kappnav-config"
 	kappnavComponentNamespaces = "kappnav.component.namespaces" // annotation for additional namespaces for application components
-
-	// WAS related kinds
-	LibertyApp        = "Liberty-App"
-	LibertyCollective = "Liberty-Collective"
-	WasNdCell         = "WAS-ND-Cell"
-	WasTraditionalApp = "WAS-Traditional-App"
 )
 
 func logStack(msg string) {

@@ -109,20 +109,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// start watching applications
-	//resController.AddToWatch(APPLICATION)
-
-	// start auto-creation
-	//resController.AddToWatch(DEPLOYMENT)
-
-	// start watching WAS ND Cell
-	// populate applications first before cell
-	// resController.AddToWatch(WAS_TRADITIONAL_APP_KIND)
-	// resController.AddToWatch(WAS_TRADITIONAL_CELL_KIND)
-
-	// wait forever
 	select {}
-
 }
 
 func printEvent(event watch.Event) {
