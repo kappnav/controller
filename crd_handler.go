@@ -44,20 +44,6 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				if err != nil {
 					klog.Errorf("Error deleting orphaned applications: %s", err)
 				}
-			} else if (kind == WasTraditionalApp) ||
-				(kind == WasNdCell) ||
-				(kind == LibertyApp) ||
-				(kind == LibertyCollective) {
-				if resController.isAllNamespacesPermitted() {
-					// always generate status for WAS related kinds
-					resController.nsFilter.permitAllNamespacesForKind(kind)
-				} else {
-					// only get status for WAS kinds in namespaces allowed in this kappnav instance
-					for _, ns := range resController.namespaces {
-						resController.nsFilter.permitNamespace(resController, kind, ns)
-					}
-				}
-				resController.AddToWatch(kind)
 			}
 		}
 	}
