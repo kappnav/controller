@@ -42,6 +42,7 @@ func newHandlerManager() *HandlerManager {
 
 	ret.setPrimaryHandler(APPLICATION, &batchApplicationHandler)
 	ret.setPrimaryHandler(CustomResourceDefinition, &CRDNewHandler)
+	ret.setPrimaryHandler(KAppNav, &KAppNavHandler)
 	ret.addOtherHandler(DEPLOYMENT, &autoCreateAppHandler)
 	ret.addOtherHandler(STATEFULSET, &autoCreateAppHandler)
 	return ret
@@ -84,8 +85,8 @@ func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatch
 	if handler != nil {
 		if handler.primaryHandler != nil {
 			if resController.isEventPermitted(eventData) {
-				// Kinds: Application or CustomResourceDefinition
-				// Call batchApplicationHandler or CRDNewHandler
+				// Kinds: Application, CustomResourceDefinition, or KAppNav
+				// Call batchApplicationHandler, CRDNewHandler, or KAppNavHandler
 				err1 := (*handler.primaryHandler)(resController, rw, eventData)
 				if err1 != nil {
 					err = err1
