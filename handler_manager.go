@@ -78,6 +78,9 @@ func (mgr *HandlerManager) addOtherHandler(kind string, handler *resourceActionF
  */
 func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
 
+	if klog.V(4) {
+		klog.Infof("callHandlers entry %s %v\n", kind, eventData)
+	}
 	handler := mgr.handlers[kind]
 	// TODO: can this be done better? For now, We just accumulate one error and log the rest
 	var err error
@@ -121,6 +124,9 @@ func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatch
 			err = err4
 			klog.Errorf("Error calling default primary handler for kind %s, error: %s", kind, err)
 		}
+	}
+	if klog.V(4) {
+		klog.Infof("callHandlers exit %v\n", err)
 	}
 	return err
 }
