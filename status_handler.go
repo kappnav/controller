@@ -288,13 +288,23 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 	key := resInfo.key()
 	if res, ok := hasStatus[key]; ok {
 		// status already computed
+		if klog.V(4) {
+			klog.Infof("processOneResource status already computed  %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+		}
 		return res.kappnavStatVal, nil
 	}
 	_, ok := toFetch[key]
 	if ok {
 		// Resource has changed. Compute status from api Server
+		if klog.V(4) {
+			klog.Infof("processOneResource fetching status for %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+		}
 		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo.kind, resInfo.namespace, resInfo.name)
 		if err != nil {
+			if klog.V(4) {
+				klog.Infof("processOneResource error fetching status for %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+				klog.Infof("%v\n", err)
+			}
 			return stat, err
 		}
 		if stat != resInfo.kappnavStatVal || flyover != resInfo.flyOver || flyoverNLS != resInfo.flyOverNLS {
@@ -310,7 +320,7 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 		}
 		return stat, nil
 	}
-	// Rsrouce has not changed. Use pre-existig status
+	// Resource has not changed. Use pre-existig status
 	hasStatus[key] = resInfo
 	return resInfo.kappnavStatVal, nil
 }
