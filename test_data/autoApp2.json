@@ -23,15 +23,15 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "App",
+                "group": "apps/v1",
                 "kind": "Deployment"
             },
             {
-                "group": "App",
+                "group": "/v1",
                 "kind": "Service"
             },
             {
-                "group": "App",
+                "group": "networking.k8s.io/v1beta1",
                 "kind": "Ingress"
             }
         ],

@@ -21,24 +21,35 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"k8s.io/klog"
 )
 
 // function to calculate component status.
-type calculateComponentStatusFunc func(destUrl string, componentKind string, namespace string, componentName string) (status string, flyover string, flyOverNLS string, retErr error)
+type calculateComponentStatusFunc func(destUrl string, resInfo *resourceInfo) (status string, flyover string, flyOverNLS string, retErr error)
 
 // http client to API srever
 var client = &http.Client{}
 
 /* Call API server to calculate component status */
-func calculateComponentStatus(destURL string, componentKind string, namespace string, componentName string) (status string, flyover string, flyoverNLS string, retErr error) {
+func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status string, flyover string, flyoverNLS string, retErr error) {
 
 	status = ""
 	flyover = ""
 	flyoverNLS = ""
-	query := url.QueryEscape(namespace)
-	urlPath := destURL + "/kappnav/status/" + componentName + "/" + componentKind + "?namespace=" + query
+	query := url.QueryEscape(resInfo.namespace)
+	apiVersion := resInfo.apiVersion
+	if !strings.Contains(apiVersion, "/") {
+		apiVersion = "/" + apiVersion
+		if klog.V(4) {
+			klog.Infof("calculateComponentStatus using apiVersion: %s instead of %s", apiVersion, resInfo.apiVersion)
+		}
+	}
+	urlPath := destURL + "/kappnav/status/" + resInfo.name + "/" + resInfo.kind + "?namespace=" + query + "&apiversion=" + url.QueryEscape(apiVersion)
+	if klog.V(4) {
+		klog.Infof("calculateComponentStatus urlPath: %s", urlPath)
+	}
 	resp, retErr := client.Get(urlPath)
 	if retErr != nil {
 		return
@@ -46,7 +57,7 @@ func calculateComponentStatus(destURL string, componentKind string, namespace st
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", "", fmt.Errorf("calculateComponentStatus %s failed :%s", urlPath, resp.Status)
+		return "", "", "", fmt.Errorf("calculateComponentStatus failed. status: %s urlPath: %s", resp.Status, urlPath)
 	}
 	var result interface{}
 	retErr = json.NewDecoder(resp.Body).Decode(&result)
@@ -84,7 +95,7 @@ func calculateComponentStatus(destURL string, componentKind string, namespace st
 	}
 
 	if klog.V(4) {
-		klog.Infof("calculateComponentStatus url: %s, kind: %s, namespace: %s, name: %s: status: %s, flyover: %s, flyovernLS: %s, err: %s", destURL, componentKind, namespace, componentName, status, flyover, flyoverNLS, retErr)
+		klog.Infof("calculateComponentStatus url: %s, kind: %s, namespace: %s, name: %s: status: %s, flyover: %s, flyovernLS: %s, err: %s", destURL, resInfo.kind, resInfo.namespace, resInfo.name, status, flyover, flyoverNLS, retErr)
 	}
 	return
 }

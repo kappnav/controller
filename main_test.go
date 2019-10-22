@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/klog"
 )
@@ -102,27 +103,93 @@ const (
 	nonsNode                 = "test_data/NoNS-Node.json" // node resource, which has no namespace
 )
 
+/**
+*
+*   Mocks for apiVersion and kind to GVR mapping. In an actual cluster these
+*   are created dynamically via discovery
+*
+**/
+
+var coreNetworkPolicyGVR = schema.GroupVersionResource{
+	Group:    "networking.k8s.io",
+	Version:  "v1beta1",
+	Resource: "networkpolicies",
+}
+var coreFooGVR = schema.GroupVersionResource{
+	Group:    "samplecontroller.k8s.io",
+	Version:  "v1alpha1",
+	Resource: "foos",
+}
+
+func init() {
+	if klog.V(2) {
+		klog.Infof("Initializing kind to GVR map mocks")
+	}
+
+	coreKindToGVR["NetworkPolicy"] = coreNetworkPolicyGVR
+	coreKindToGVR["Foo"] = coreFooGVR
+}
+func initControllerMaps(resController *ClusterWatcher) {
+	if klog.V(2) {
+		klog.Info("initControllerMaps")
+	}
+
+	resController.apiVersionKindToGVR.Store("v1/Service", coreServiceGVR)
+	resController.apiVersionKindToGVR.Store("apps/v1/Deployment", coreDeploymentGVR)
+	resController.apiVersionKindToGVR.Store("route.openshift.io/v1/Route", coreRouteGVR)
+	resController.apiVersionKindToGVR.Store("v1/ConfigMap", coreConfigMapGVR)
+	resController.apiVersionKindToGVR.Store("v1/Secret", coreSecretGVR)
+	resController.apiVersionKindToGVR.Store("core/v1/Volume", coreVolumeGVR)
+	resController.apiVersionKindToGVR.Store("v1/PersistentVolumeClaim", corePersistentVolumeClaimGVR)
+	resController.apiVersionKindToGVR.Store("apiextensions.k8s.io/v1beta1/CustomResourceDefinition", coreCustomResourceDefinitionGVR)
+	resController.apiVersionKindToGVR.Store("app.k8s.io/v1beta1/Application", coreApplicationGVR)
+	resController.apiVersionKindToGVR.Store("apps/v1/StatefulSet", coreStatefulSetGVR)
+	resController.apiVersionKindToGVR.Store("networking.k8s.io/v1beta1/Ingress", coreIngressGVR)
+	resController.apiVersionKindToGVR.Store("networking.k8s.io/v1beta1/NetworkPolicy", coreNetworkPolicyGVR)
+	resController.apiVersionKindToGVR.Store("samplecontroller.k8s.io/v1alpha1/Foo", coreFooGVR)
+	resController.apiVersionKindToGVR.Store("batch/v1/Job", coreJobGVR)
+	resController.apiVersionKindToGVR.Store("v1/ServiceAccount", coreServiceAccountGVR)
+	resController.apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/ClusterRole", coreClusterRoleGVR)
+	resController.apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/ClusterRoleBinding", coreClusterRoleBindingGVR)
+	resController.apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/Role", coreRoleGVR)
+	resController.apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/RoleBinding", coreRoleBindingGVR)
+	resController.apiVersionKindToGVR.Store("storage.k8s.io/v1/StorageClass", coreStorageClassGVR)
+	resController.apiVersionKindToGVR.Store("v1/Endpoint", coreEndpointGVR)
+	resController.apiVersionKindToGVR.Store("samplecontroller.k8s.io/v1alpha1/Foo", coreFooGVR)
+	resController.apiVersionKindToGVR.Store("v1/Node", coreNodeGVR)
+}
+
+func beforeTest() {
+}
+
 // returns function to get component status, scoped by the testActions
 func newComponentStatusFunc(ta *testActions, failRate float32) calculateComponentStatusFunc {
 	var testActs = ta
 	var failureRate = failRate
-	return func(destUrl string, componentKind string, namespace string, componentName string) (status string, flyover string, flyoverNLS string, retErr error) {
+	return func(destUrl string, resInfo *resourceInfo) (status string, flyover string, flyoverNLS string, retErr error) {
 		if rand.Float32() < failureRate {
-			return "", "", "", fmt.Errorf("In test %s, random error introduced when getting status for %s %s %s", testActs.testName, componentKind, namespace, componentName)
+			return "", "", "", fmt.Errorf("In test %s, random error introduced when getting status for %s %s %s", testActs.testName, resInfo.kind, resInfo.namespace, resInfo.name)
 		}
-		return testActs.getStatus(componentKind, namespace, componentName)
+		return testActs.getStatus(resInfo.kind, resInfo.namespace, resInfo.name)
 	}
 }
 
 // Create a new ClusterWatcher for unit test environment
 // pre-populating it with resources
 func createClusterWatcher(resources []resourceID, testActions *testActions, failureRate float32) (*ClusterWatcher, error) {
+	if klog.V(3) {
+		klog.Info("createClusterWatcher entry")
+	}
+
 	scheme := runtime.NewScheme()
 	dynClient := fake.NewSimpleDynamicClient(scheme)
 
 	fakeDiscovery := newFakeDiscovery()
 	err := populateResources(resources, dynClient, fakeDiscovery)
 	if err != nil {
+		if klog.V(2) {
+			klog.Info("createClusterWatcher exit exiting, error: #v", err)
+		}
 		return nil, err
 	}
 
@@ -131,20 +198,23 @@ func createClusterWatcher(resources []resourceID, testActions *testActions, fail
 	resController, err := NewClusterWatcher(plugin)
 	if err != nil {
 		if klog.V(3) {
-			klog.Infof("Error calling NewClusterWatcher: %s", err)
+			klog.Infof("createClusterWatcher Error calling NewClusterWatcher: %s", err)
 		}
 		return resController, err
 	}
-	testActions.setClusterWatcher(resController)
+	initControllerMaps(resController)
 
+	testActions.setClusterWatcher(resController)
+	if klog.V(3) {
+		klog.Info("createClusterWatcher exit success")
+	}
 	return resController, nil
 }
 
 // Test we can populate the cache with a bunch of resources
 func TestPopulateResources(t *testing.T) {
-
 	testName := "TestPopulateResources"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{}
 
@@ -303,7 +373,7 @@ func TestOneApp(t *testing.T) {
 /* Test nested application */
 func TestNestedApp(t *testing.T) {
 	testName := "TestNestedApp"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -387,7 +457,7 @@ func TestNestedApp(t *testing.T) {
 /* Test adding resources */
 func TestAddResource(t *testing.T) {
 	testName := "TestAddResource"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -501,7 +571,7 @@ func TestAddResource(t *testing.T) {
 /* Test delete resource */
 func TestDeleteResource(t *testing.T) {
 	testName := "TestDeleteResource"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -604,7 +674,7 @@ The application loop2B depends on ratings and loop2A
 */
 func TestLoop2(t *testing.T) {
 	testName := "TestLoop2"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -729,7 +799,7 @@ In this test,
 */
 func TestLoop4(t *testing.T) {
 	testName := "TestLoop4"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -882,7 +952,7 @@ func TestLoop4(t *testing.T) {
 func TestChangeSpec(t *testing.T) {
 
 	testName := "TestChangeSpec"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:     true,
@@ -1034,7 +1104,7 @@ func TestChangeSpec(t *testing.T) {
 
 func TestNegative(t *testing.T) {
 	testName := "TestNegative"
-
+	beforeTest()
 	if err := oneAppHelper(t, testName, false); err != nil {
 		t.Fatal(err)
 	}
@@ -1042,7 +1112,7 @@ func TestNegative(t *testing.T) {
 
 func TestCRDFoo(t *testing.T) {
 	testName := "TestCRDFoo"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION: true,
@@ -1111,7 +1181,7 @@ func TestCRDFoo(t *testing.T) {
 
 func TestNamespace(t *testing.T) {
 	testName := "TestNamespace"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -1222,7 +1292,7 @@ func TestNamespace(t *testing.T) {
 // - Expected result: No status returned by any resources
 func TestNamespace1(t *testing.T) {
 	testName := "TestNamespace1"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		"Application": true,
@@ -1289,7 +1359,7 @@ func TestNamespace1(t *testing.T) {
 //     No status returned for ns3, ns4 resources
 func TestNamespace2(t *testing.T) {
 	testName := "TestNamespace2"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		"Application": true,
@@ -1351,7 +1421,7 @@ func TestNamespace2(t *testing.T) {
 //     No status returned for ns1, ns2, ns3 resources
 func TestNamespace3(t *testing.T) {
 	testName := "TestNamespace3"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		"Application": true,
@@ -1416,7 +1486,7 @@ func TestNamespace3(t *testing.T) {
 //     No status returned for ns4 resources
 func TestNamespace4(t *testing.T) {
 	testName := "TestNamespace4"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		"Application": true,
@@ -1474,7 +1544,7 @@ existing resource in other namespaces are not affected
 */
 func TestNamespacePreExisting(t *testing.T) {
 	testName := "TestNamespacePreExisting"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -1542,7 +1612,7 @@ func TestNamespacePreExisting(t *testing.T) {
 /* Test adding kappnav.component.namepsaces annotation */
 func TestComponentNamespaces(t *testing.T) {
 	testName := "TestComponentNamespaces"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -1628,7 +1698,7 @@ func TestComponentNamespaces(t *testing.T) {
 
 func TestNoNamespaceResource(t *testing.T) {
 	testName := "TestNoNamespaceResource"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION: true,

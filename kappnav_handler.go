@@ -53,7 +53,7 @@ var KAppNavHandler resourceActionFunc = func(resController *ClusterWatcher, rw *
 	if !exists {
 		// KAppNav kind has been deleted
 		klog.Info("KAppNav kind has been deleted")
-		resController.deleteKind(eventData.obj)
+		resController.deleteGVR(eventData.obj)
 	} else {
 		// KAppNav resource added, modified, deleted
 		if eventData.funcType == AddFunc {
