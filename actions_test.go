@@ -31,7 +31,7 @@ import (
 
 // Check whether a resource exists
 func resourceExists(resController *ClusterWatcher, resInfo resourceID) (bool, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVRForKind(resInfo.kind)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -53,7 +53,7 @@ func resourceExists(resController *ClusterWatcher, resInfo resourceID) (bool, er
 }
 
 func getResource(resController *ClusterWatcher, resInfo resourceID) (*unstructured.Unstructured, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVRForKind(resInfo.kind)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -75,7 +75,7 @@ func getResource(resController *ClusterWatcher, resInfo resourceID) (*unstructur
 
 // get kappnav status of resource
 func resourcekAppNavStatus(resController *ClusterWatcher, resInfo resourceID) (string, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVRForKind(resInfo.kind)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -216,7 +216,7 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 		return nil
 	}
 
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVRForKind(resInfo.kind)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface

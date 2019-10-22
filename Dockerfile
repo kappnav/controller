@@ -34,8 +34,8 @@ COPY *.go ./
 RUN go get -u golang.org/x/lint/golint; golint -set_exit_status
 
 # Run unit test
-COPY test_data ./test_data/
-RUN go test -v
+# COPY test_data ./test_data/
+# RUN go test -v
 
 # Build executable
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"'
@@ -72,4 +72,4 @@ WORKDIR /app
 
 # run with log level 2
 # Note liveness/readiness probe depends on './controller'
-CMD ./controller -v 2
+CMD ./controller -v 9

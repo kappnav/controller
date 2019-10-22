@@ -215,7 +215,7 @@ func resourceComponentOfApplication(resController *ClusterWatcher, appResInfo *a
 	if !isContainedIn(appResInfo.componentKinds, resInfo.kind) {
 		// resource kind not what the application wants to include
 		if klog.V(4) {
-			klog.Infof("    resourceComponentOfApplication false: component kinds: %s, resource kind: %s\n", appResInfo.componentKinds, resInfo.kind)
+			klog.Infof("    resourceComponentOfApplication false: component kinds: %v, resource kind: %s\n", appResInfo.componentKinds, resInfo.kind)
 		}
 		return false
 	}
@@ -248,9 +248,9 @@ func resourceComponentOfApplication(resController *ClusterWatcher, appResInfo *a
 // Delete given resource from Kube
 func deleteResource(resController *ClusterWatcher, resInfo *resourceInfo) error {
 	if klog.V(4) {
-		klog.Infof("deleteResource %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+		klog.Infof("deleteResource GVR: %s namespace: %s name: %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
 	}
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		// resource still being watched
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
@@ -265,13 +265,13 @@ func deleteResource(resController *ClusterWatcher, resInfo *resourceInfo) error 
 		err = intf.Delete(resInfo.name, nil)
 		if err != nil {
 			if klog.V(4) {
-				klog.Infof("    deleteResource error: %s %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name, err)
+				klog.Infof("    deleteResource error: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err)
 			}
 			return err
 		}
 	}
 	if klog.V(4) {
-		klog.Infof("    deleteResource success: %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+		klog.Infof("    deleteResource success: %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
 	}
 	return nil
 }
@@ -279,10 +279,10 @@ func deleteResource(resController *ClusterWatcher, resInfo *resourceInfo) error 
 // Check if resource is deleted
 func resourceDeleted(resController *ClusterWatcher, resInfo *resourceInfo) (bool, error) {
 	if klog.V(4) {
-		klog.Infof("resourceDeleted  %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
+		klog.Infof("resourceDeleted  %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
 	}
 
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -296,11 +296,11 @@ func resourceDeleted(resController *ClusterWatcher, resInfo *resourceInfo) (bool
 		var err error
 		_, err = intf.Get(resInfo.name, metav1.GetOptions{})
 		if err == nil {
-			return false, fmt.Errorf("Resource %s %s %s not deleted", resInfo.kind, resInfo.namespace, resInfo.name)
+			return false, fmt.Errorf("Resource %s %s %s not deleted", resInfo.gvr, resInfo.namespace, resInfo.name)
 		}
 		// TODO: better checking between error and resource deleted
 		if klog.V(4) {
-			klog.Infof("    resourceDeleted true: %s %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name, err)
+			klog.Infof("    resourceDeleted true: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err)
 		}
 		return true, nil
 	}
@@ -314,7 +314,7 @@ func getApplicationsForResource(resController *ClusterWatcher, resInfo *resource
 	}
 	var ret = make([]*appResourceInfo, 0)
 	// loop over all applications
-	var apps = resController.listResources(APPLICATION)
+	var apps = resController.listResources(coreApplicationGVR)
 	for _, app := range apps {
 		var unstructuredObj = app.(*unstructured.Unstructured)
 		var appResInfo = &appResourceInfo{}
@@ -351,7 +351,7 @@ func findAllApplicationsForResource(resController *ClusterWatcher, obj interface
 
 func findAllApplicationsForResourceHelper(resController *ClusterWatcher, resInfo *resourceInfo, alreadyFound map[string]*resourceInfo) {
 
-	if resInfo.kind == APPLICATION {
+	if resInfo.gvr == coreApplicationGVR {
 		key := resInfo.key()
 		_, exists := alreadyFound[key]
 		if exists {
@@ -436,15 +436,16 @@ func startWatchApplicationComponentKinds(resController *ClusterWatcher, obj inte
 			var componentKinds = appInfo.componentKinds
 			nsFilter := resController.nsFilter
 			for _, elem := range componentKinds {
+				// TODO: PWB process group here, map to gvr
 				/* Start processing kinds in the application's namespace */
-				nsFilter.permitNamespace(resController, elem.kind, appInfo.resourceInfo.namespace)
+				nsFilter.permitNamespace(resController, elem.gvr, appInfo.resourceInfo.namespace)
 
 				/* also permit namespaces in the kappnav.component.namespaces annotation */
 				for _, ns := range appInfo.componentNamespaces {
-					nsFilter.permitNamespace(resController, elem.kind, ns)
+					nsFilter.permitNamespace(resController, elem.gvr, ns)
 				}
 
-				err := resController.AddToWatch(elem.kind)
+				err := resController.AddToWatch(elem.gvr)
 				if err != nil {
 					// TODO: should we continue to process the rest of kinds?
 					return err

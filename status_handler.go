@@ -31,7 +31,7 @@ func sendResourceStatus(resController *ClusterWatcher, resInfo *resourceInfo, st
 	if klog.V(4) {
 		klog.Infof("sendResourceStatus %s set to %s\n", resInfo.name, status)
 	}
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -225,7 +225,8 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 	// loop over all components kinds
 	for _, component := range componentKinds {
 		// loop over all resources of each component kind
-		var resources = resController.listResources(component.kind)
+		gvr, ok := resController.getGVRForGroupKind(component.group, component.kind)
+		var resources = resController.listResources(gvr)
 		for _, res := range resources {
 
 			var unstructuredObj = res.(*unstructured.Unstructured)
