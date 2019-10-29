@@ -41,11 +41,15 @@ RUN go test -v
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"'
 
 # Stage 2: Build official image based on UBI
-FROM registry.access.redhat.com/ubi7-minimal:7.6-123
+FROM registry.access.redhat.com/ubi7-minimal
+
+ARG VERSION
+ARG BUILD_DATE
 
 LABEL name="Application Navigator" \
-      version="0.1.0" \
-      release="0.1.0" \
+      version=$VERSION \
+      release=$VERSION \
+      created=$BUILD_DATE \
       vendor="kAppNav" \
       summary="Controller image for Application Navigator" \
       description="This image contains the Controller for Application Navigator"
