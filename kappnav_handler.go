@@ -80,7 +80,7 @@ func updateKappnav(eventData *eventHandlerData) error {
 
 	kubeEnv := os.Getenv("KUBE_ENV")
 	klog.Info("KUBE_ENV = " + kubeEnv)
-	if kubeEnv == "okd" || kubeEnv == "ocp" {
+	if kubeEnv == "okd" {
 
 		if isLatestOKD {
 			// TODO: Handle Latest/OpenShiftWebConsoleConfig case
@@ -158,7 +158,7 @@ func updateKappnav(eventData *eventHandlerData) error {
 func deleteKappnav(eventData *eventHandlerData) error {
 	kubeEnv := os.Getenv("KUBE_ENV")
 	klog.Info("KUBE_ENV = " + kubeEnv)
-	if kubeEnv == "okd" || kubeEnv == "ocp" {
+	if kubeEnv == "okd" {
 
 		if isLatestOKD {
 			// TODO: Handle Latest/OpenShiftWebConsoleConfig case
