@@ -16,8 +16,8 @@
 
 set -Eeo pipefail
 
+. ../build/version.sh
 IMAGE=kappnav-controller
-VERSION=0.1.2
 
 echo "Building ${IMAGE} ${VERSION}"
 
