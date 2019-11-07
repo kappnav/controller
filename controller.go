@@ -136,6 +136,26 @@ const (
 	kappnavComponentNamespaces = "kappnav.component.namespaces" // annotation for additional namespaces for application components
 )
 
+var coreKinds map[schema.GroupVersionResource]bool
+
+func init() {
+	coreServiceKind := &schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "services",
+	}
+
+	coreRouteKind := &schema.GroupVersionResource{
+		Group:    "route.openshift.io",
+		Version:  "v1",
+		Resource: "routes",
+	}
+
+	coreKinds = make(map[schema.GroupVersionResource]bool)
+	coreKinds[*coreServiceKind] = true
+	coreKinds[*coreRouteKind] = true
+}
+
 func logStack(msg string) {
 	buf := make([]byte, 4096)
 	len := runtime.Stack(buf, false)
@@ -526,6 +546,15 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 		// create new entry
 		rw = &ResourceWatcher{}
 		resController.resourceMap[kind] = rw
+	} else {
+		// don't replace core Kind with a custom kind
+		_, ok := coreKinds[rw.GroupVersionResource]
+		if ok {
+			klog.Infof("Using core kind %s with: group: %s  version: %s  plural: %s  namespaced: %t", rw.kind, rw.Group, rw.Version, rw.Resource, rw.namespaced)
+			klog.Infof("     instead of %s with: group: %s  version: %s  plural: %s  namespaced: %t", kind, group, version, plural, namespaced)
+			resController.mutex.Unlock()
+			return
+		}
 	}
 	rw.Group = group
 	rw.Version = version
@@ -675,7 +704,8 @@ func (resController *ClusterWatcher) startWatch(inputKind string) error {
 		return nil
 	}
 	if klog.V(2) {
-		klog.Infof("new startWatch %s\n", kind)
+		klog.Infof("new startWatch kind: %s GVR: %v\n", kind, rw.GroupVersionResource)
+		klog.Infof("     group: %s  version: %s  resource: %s\n", rw.Group, rw.Version, rw.Resource)
 	}
 
 	// handler, ok  := resController.handlers[kind]
