@@ -97,7 +97,11 @@ const (
 	DEPLOYMENT                 = "Deployment"
 	STATEFULSET                = "StatefulSet"
 	APPLICATION                = "Application"
+	KAppNav                    = "KAppNav"
+	KappnavUIService           = "kappnav-ui-service"
 	CustomResourceDefinition   = "CustomResourceDefinition"
+	OpenShiftWebConsoleConfig  = "OpenShiftWebConsoleConfig"
+	OpenShiftWebConsole        = "openshift-web-console"
 	V1                         = "v1"
 	CONFIGMAPS                 = "configmaps"
 	APIVERSION                 = "apiVersion"
@@ -881,7 +885,7 @@ type matchExpression struct {
 	values   []string
 }
 
-// Parsed information about an application
+// Application resource fields
 type appResourceInfo struct {
 	resourceInfo
 	componentNamespaces map[string]string // additional namespaces for namespaced component kinds

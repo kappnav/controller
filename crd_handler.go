@@ -40,6 +40,7 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				resController.AddToWatch(APPLICATION)
 				resController.AddToWatch(DEPLOYMENT)
 				resController.AddToWatch(STATEFULSET)
+				resController.AddToWatch(KAppNav)
 				err = deleteOrphanedAutoCreatedApplications(resController)
 				if err != nil {
 					klog.Errorf("Error deleting orphaned applications: %s", err)

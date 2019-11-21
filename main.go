@@ -26,7 +26,8 @@ import (
 	"strings"
 	"syscall"
 
-	v1 "k8s.io/api/core/v1"
+	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -42,10 +43,14 @@ const (
 )
 
 var (
-	apiURL     string        // URL of API server
-	masterURL  string        // URL of Kube master
-	kubeconfig string        // path to kube config file. default <home>/.kube/config
-	klogFlags  *flag.FlagSet // flagset for logging
+	apiURL        string        // URL of API server
+	masterURL     string        // URL of Kube master
+	kubeconfig    string        // path to kube config file. default <home>/.kube/config
+	klogFlags     *flag.FlagSet // flagset for logging
+	kubeClient    *kubernetes.Clientset
+	routeV1Client *routev1.RouteV1Client
+	isLatestOKD   bool = false
+	isOKD         bool = false
 )
 
 func init() {
@@ -86,7 +91,6 @@ func main() {
 		}
 	}
 
-	var kubeClient *kubernetes.Clientset
 	kubeClient, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatal(err)
@@ -99,8 +103,27 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// gvr := schema.GroupVersionResource { Group: "app.k8s.io", Version: "v1beta1", Resource: "applications" }
-	// deleteOrphanedAutoCreatedApplications(dynamicClient, gvr )
+	kubeEnv := os.Getenv("KUBE_ENV")
+	klog.Info("KUBE_ENV = " + kubeEnv)
+	if kubeEnv == "minishift" || kubeEnv == "okd" || kubeEnv == "ocp" {
+		routeV1Client, err = routev1.NewForConfig(cfg)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		groupLists, resourceLists, err := kubeClient.DiscoveryClient.ServerGroupsAndResources()
+		if err == nil && groupLists != nil && resourceLists != nil {
+			for _, resourceList := range resourceLists {
+				for _, resource := range resourceList.APIResources {
+					//klog.Info("Found resource kind = " + resource.Kind)
+					if resource.Kind == OpenShiftWebConsoleConfig {
+						klog.Info("Found resource kind OpenShiftWebConsoleConfig, assuming OpenShift Container Platform" + resource.Kind)
+						isLatestOKD = true
+						break
+					}
+				}
+			}
+		}
+	}
 
 	plugin := &ControllerPlugin{dynamicClient, discClient, DefaultBatchDuration, calculateComponentStatus}
 	// resController, err := NewClusterWatcher(plugin)
@@ -165,7 +188,7 @@ func printObject(obj interface{}, indent string) {
 	}
 }
 
-func printPods(pods *v1.PodList) {
+func printPods(pods *corev1.PodList) {
 	for _, pod := range pods.Items {
 		klog.Infof("%s", pod.ObjectMeta.Name)
 	}
