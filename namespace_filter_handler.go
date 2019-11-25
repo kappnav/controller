@@ -40,7 +40,7 @@ type namespaceFilter struct {
 }
 
 /* Permit all namespaces for a gvr. Needs to be called during initialization */
-func (nsFilter *namespaceFilter) permitAllNamespacesForKind(gvr schema.GroupVersionResource) {
+func (nsFilter *namespaceFilter) permitAllNamespacesForGVR(gvr schema.GroupVersionResource) {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
 	if klog.V(3) {

@@ -137,10 +137,9 @@ const (
 )
 
 var (
-	coreGVR             map[schema.GroupVersionResource]bool
 	coreKindToGVR       map[string]schema.GroupVersionResource
-	apiVersionKindToGVR map[string]schema.GroupVersionResource
-	coreKindToPlural    = make(map[string]string)
+	apiVersionKindToGVR sync.Map
+	// mapmutex            sync.Mutex
 
 	coreServiceGVR = schema.GroupVersionResource{
 		Group:    "",
@@ -240,26 +239,6 @@ var (
 )
 
 func init() {
-	coreGVR = make(map[schema.GroupVersionResource]bool)
-	coreGVR[coreServiceGVR] = true
-	coreGVR[coreDeploymentGVR] = true
-	coreGVR[coreConfigMapGVR] = true
-	coreGVR[coreSecretGVR] = true
-	coreGVR[coreVolumeGVR] = true
-	coreGVR[coreRouteGVR] = true
-	coreGVR[coreCustomResourceDefinitionGVR] = true
-	coreGVR[coreApplicationGVR] = true
-	coreGVR[coreStatefulSetGVR] = true
-	coreGVR[coreIngressGVR] = true
-	coreGVR[coreJobGVR] = true
-	coreGVR[coreServiceAccountGVR] = true
-	coreGVR[coreClusterRoleGVR] = true
-	coreGVR[coreClusterRoleBindingGVR] = true
-	coreGVR[coreRoleGVR] = true
-	coreGVR[coreRoleBindingGVR] = true
-	coreGVR[coreStorageClassGVR] = true
-	coreGVR[coreEndpointGVR] = true
-	coreGVR[corePersistentVolumeClaimGVR] = true
 
 	coreKindToGVR = make(map[string]schema.GroupVersionResource)
 	coreKindToGVR["Service"] = coreServiceGVR
@@ -282,28 +261,6 @@ func init() {
 	coreKindToGVR["StorageClass"] = coreStorageClassGVR
 	coreKindToGVR["Endpoint"] = coreEndpointGVR
 
-	coreKindToPlural = make(map[string]string)
-	coreKindToPlural["Service"] = "services"
-	coreKindToPlural["Deployment"] = "deployments"
-	coreKindToPlural["Route"] = "routes"
-	coreKindToPlural["ConfigMap"] = "configmaps"
-	coreKindToPlural["Secret"] = "secrets"
-	coreKindToPlural["Volume"] = "volumes"
-	coreKindToPlural["PersistentVolumeClaim"] = "persistentvolumeclaims"
-	coreKindToPlural["CustomResourceDefinition"] = "customresourcedefinitions"
-	coreKindToPlural["Application"] = "applications"
-	coreKindToPlural["StatefulSet"] = "statefulsets"
-	coreKindToPlural["Ingress"] = "ingresses"
-	coreKindToPlural["Job"] = "jobs"
-	coreKindToPlural["ServiceAccount"] = "serviceaccounts"
-	coreKindToPlural["ClusterRole"] = "clusterroles"
-	coreKindToPlural["ClusterRoleBinding"] = "clusterrolebindings"
-	coreKindToPlural["Role"] = "roles"
-	coreKindToPlural["RoleBinding"] = "rolebindings"
-	coreKindToPlural["StorageClass"] = "storageclasses"
-	coreKindToPlural["Endpoint"] = "endpoints"
-
-	apiVersionKindToGVR = make(map[string]schema.GroupVersionResource)
 }
 
 func logStack(msg string) {
@@ -640,7 +597,8 @@ func (resController *ClusterWatcher) getWatchGVRForKind(kind string) (schema.Gro
 	return resController.getWatchGVR(gvr)
 }
 
-// getWatchGVR gets the currently watched GVR for a given GVR. It returns false if the input GVR is not being watched or is different from the watched GVR
+// getWatchGVR gets the GVR from the resourceWatcher. It returns false if there is no resourceWatcher
+// or the input GVR is different from the watched GVR
 func (resController *ClusterWatcher) getWatchGVR(gvr schema.GroupVersionResource) (schema.GroupVersionResource, bool) {
 	resController.mutex.Lock()
 	rw, ok := resController.resourceMap[gvr]
@@ -659,16 +617,11 @@ func (resController *ClusterWatcher) getWatchGVR(gvr schema.GroupVersionResource
 	return schema.GroupVersionResource{}, false
 }
 
-// Get the GroupVersionResource for a kind and group
+// getGVRForGroupKind gets the GroupVersionResource for a kind and group
 func (resController *ClusterWatcher) getGVRForGroupKind(inGroup string, kind string) (schema.GroupVersionResource, bool) {
-	if inGroup == "" {
-		gvr, ok := coreKindToGVR[kind]
-		if ok {
-			klog.Infof("getGVRForGroupKind for group: %s kind: %s returning: %v", inGroup, kind, gvr)
-			return gvr, true
-		}
-	}
+
 	// we do the magical mapping here
+
 	/**
 	if group does not have / (including "")
 	   if kind is core kind
@@ -678,19 +631,38 @@ func (resController *ClusterWatcher) getGVRForGroupKind(inGroup string, kind str
 	else
 	   use gvr with specified group and kind
 	*/
-	var gvr schema.GroupVersionResource
-	if strings.Contains(inGroup, "/") {
-		split := strings.Split(inGroup, "/")
-		gvr.Group = split[0]
-		gvr.Version = split[1]
+
+	if !strings.Contains(inGroup, "/") {
+		gvr, ok := coreKindToGVR[kind]
+		if ok {
+			if klog.V(2) {
+				klog.Infof("getGVRForGroupKind no group with kind: %s returning GVR: %v", kind, gvr)
+			}
+			return gvr, true
+		}
+		if klog.V(2) {
+			klog.Infof("getGVRForGroupKind no group with kind: %s is not a core kind, returning false", kind)
+		}
+		return schema.GroupVersionResource{}, false
 	}
-	resource, ok := coreKindToPlural[kind]
+	split := strings.Split(inGroup, "/")
+	apiVersionKind := split[1] + "/" + kind
+	if split[0] != "" {
+		apiVersionKind = split[0] + "/" + apiVersionKind
+	}
+	if klog.V(2) {
+		klog.Infof("getGVRForGroupKind using apiVersion/Kind: %s", apiVersionKind)
+	}
+	gvr, ok := apiVersionKindToGVR.Load(apiVersionKind)
 	if ok {
-		gvr.Resource = resource
-		klog.Infof("getGVRForGroupKind for group: %s kind: %s returning: %v", inGroup, kind, gvr)
-		return gvr, true
+		if klog.V(2) {
+			klog.Infof("getGVRForGroupKind for group: %s kind: %s returning: %v", inGroup, kind, gvr.(schema.GroupVersionResource))
+		}
+		return gvr.(schema.GroupVersionResource), true
 	}
-	klog.Infof("getGVRForGroupKind for group: %s kind: %s is not a core kind, returning: %v", inGroup, kind, schema.GroupVersionResource{})
+	if klog.V(2) {
+		klog.Infof("getGVRForGroupKind no CRD found for group: %s kind: %s, returning false", inGroup, kind)
+	}
 	return schema.GroupVersionResource{}, false
 }
 
@@ -768,7 +740,7 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 	if klog.V(2) {
 		klog.Infof("addResourceMapEntry mapping apiVersion/Kind: %s to GVR: %s", apiVersionKind, gvr)
 	}
-	apiVersionKindToGVR[apiVersionKind] = gvr
+	apiVersionKindToGVR.Store(apiVersionKind, gvr)
 	rw.Group = group
 	rw.Version = version
 	rw.Resource = plural
@@ -804,11 +776,8 @@ func (resController *ClusterWatcher) deleteResourceMapEntry(gvr schema.GroupVers
 	if klog.V(2) {
 		klog.Infof("deleteResourceMapEntry using apiVersion/Kind: %s for GVR: %s", apiVersionKind, gvr)
 	}
-	_, ok = apiVersionKindToGVR[apiVersionKind]
-	if ok {
-		// can be deleted
-		delete(apiVersionKindToGVR, apiVersionKind)
-	}
+	apiVersionKindToGVR.Delete(apiVersionKind)
+
 }
 
 // print a resourceMapEntry
@@ -1162,15 +1131,17 @@ func parseResource(unstructuredObj *unstructured.Unstructured, resourceInfo *res
 	resourceInfo.kind = objMap[KIND].(string)
 	//gvr, ok := coreKindToGVR[resourceInfo.kind]
 	apiVersionKind := resourceInfo.apiVersion + "/" + resourceInfo.kind
-	gvr, ok := apiVersionKindToGVR[apiVersionKind]
-	if klog.V(4) {
-		klog.Infof("parseResource getting GVR: %s from map of apiVersion/Kind: %s", gvr, apiVersionKind)
-	}
+
+	gvr, ok := apiVersionKindToGVR.Load(apiVersionKind)
 	if ok {
 		if klog.V(4) {
-			klog.Infof("parseResource using gvr: %s", gvr)
+			klog.Infof("parseResource got gvr: %s mapped to apiVersion/Kind: %s", gvr.(schema.GroupVersionResource), apiVersionKind)
 		}
-		resourceInfo.gvr = gvr
+		resourceInfo.gvr = gvr.(schema.GroupVersionResource)
+	} else {
+		if klog.V(4) {
+			klog.Infof("parseResource no GVR is mapped to apiVersion/Kind: %s", apiVersionKind)
+		}
 	}
 	metadataObj, ok := objMap[METADATA]
 	if !ok {
@@ -1358,7 +1329,7 @@ func getCRDGVRKindSubresource(unstructuredObj *unstructured.Unstructured) (group
 
 // Add/modify a GVR of resource to be watched
 func (resController *ClusterWatcher) addGVR(obj interface{}) (gvr schema.GroupVersionResource) {
-	klog.Infof("addGVR entry obj: %v", obj)
+	klog.Infof("addGVR entry")
 	switch obj.(type) {
 	case *unstructured.Unstructured:
 		var unstructuredObj = obj.(*unstructured.Unstructured)
