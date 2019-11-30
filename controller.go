@@ -139,7 +139,6 @@ const (
 var (
 	coreKindToGVR       map[string]schema.GroupVersionResource
 	apiVersionKindToGVR sync.Map
-	// mapmutex            sync.Mutex
 
 	coreServiceGVR = schema.GroupVersionResource{
 		Group:    "",
@@ -1128,6 +1127,9 @@ func parseResource(unstructuredObj *unstructured.Unstructured, resourceInfo *res
 	resourceInfo.unstructuredObj = unstructuredObj
 	var objMap = unstructuredObj.Object
 	resourceInfo.apiVersion = objMap[APIVERSION].(string)
+	if klog.V(4) {
+		klog.Infof("parseResource apiVersion: %s", resourceInfo.apiVersion)
+	}
 	resourceInfo.kind = objMap[KIND].(string)
 	//gvr, ok := coreKindToGVR[resourceInfo.kind]
 	apiVersionKind := resourceInfo.apiVersion + "/" + resourceInfo.kind

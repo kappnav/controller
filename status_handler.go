@@ -300,7 +300,7 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 		if klog.V(4) {
 			klog.Infof("processOneResource fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
 		}
-		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo.kind, resInfo.namespace, resInfo.name)
+		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo)
 		if err != nil {
 			if klog.V(4) {
 				klog.Infof("processOneResource error fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
