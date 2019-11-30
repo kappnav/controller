@@ -187,7 +187,7 @@ var (
 		Resource: "statefulsets",
 	}
 	coreIngressGVR = schema.GroupVersionResource{
-		Group:    "extensions",
+		Group:    "networking.k8s.io",
 		Version:  "v1beta1",
 		Resource: "ingresses",
 	}
@@ -1232,23 +1232,35 @@ func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructu
 		componentKinds := tmp.([]interface{})
 		for _, component := range componentKinds {
 			var kindMap = component.(map[string]interface{})
-			group, ok1 := kindMap[GROUP].(string)
+			if klog.V(4) {
+				klog.Infof("parseAppResource application: %s kindMap: %v", appResource.name, kindMap)
+			}
+			group, _ := kindMap[GROUP].(string)
 			kind, ok2 := kindMap[KIND].(string)
-			if ok1 && ok2 {
+			if ok2 {
 				if klog.V(4) {
-					klog.Infof("parseAppResource application: %s processing component kind group: %s  kind: %s", appResource.name, group, kind)
+					klog.Infof("parseAppResource application: %s processing componentKind: group: %s  kind: %s", appResource.name, group, kind)
 				}
 				gvr, ok3 := resController.getGVRForGroupKind(group, kind)
 				if ok3 {
+					if group == "" {
+						group = "/" + gvr.Version
+						if klog.V(4) {
+							klog.Infof("parseAppResource application: %s setting group to /gvr.Version: %s", appResource.name, group)
+						}
+					}
 					var groupKind = groupKind{
 						group: group,
 						kind:  kind,
 						gvr:   gvr,
 					}
+					if klog.V(4) {
+						klog.Infof("parseAppResource application: %s groupKind: %v", appResource.name, groupKind)
+					}
 					appResource.componentKinds = append(appResource.componentKinds, groupKind)
 				} else {
 					if klog.V(4) {
-						klog.Infof("parseAppResource application: %s error creating GVR for component group: %s  kind: %s", appResource.name, group, kind)
+						klog.Infof("parseAppResource application: %s error getting GVR for componentKind: group: %s kind: %s", appResource.name, group, kind)
 					}
 				}
 			}

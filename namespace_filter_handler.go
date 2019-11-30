@@ -44,7 +44,7 @@ func (nsFilter *namespaceFilter) permitAllNamespacesForGVR(gvr schema.GroupVersi
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
 	if klog.V(3) {
-		klog.Infof("permitAllNamesapceForKind called for GVR %s", gvr)
+		klog.Infof("permitAllNamesapceForGVR called for GVR %s", gvr)
 	}
 	nsFilter.permitAllNamespaces[gvr] = gvr
 }
@@ -81,9 +81,9 @@ func (nsFilter *namespaceFilter) addNamespaceForGVR(gvr schema.GroupVersionResou
 	return true
 }
 
-/* permitNamespace adds a new namespace for given gvr to be processed for application
-   gvr: gvr for which to add namespace
-   namespace: namespace to add for processing the given gvr
+/* permitNamespace adds a new namespace for given GVR to be processed for application
+   gvr: GVR for which to add namespace
+   namespace: namespace to add for processing the given GVR
 */
 func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, gvr schema.GroupVersionResource, namespace string) {
 

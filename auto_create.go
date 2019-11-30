@@ -59,11 +59,11 @@ const (
 
 /* default kinds for auto-created app*/
 var defaultKinds = []groupKind{
-	groupKind{group: "App", kind: "Deployment"},
-	groupKind{group: "App", kind: "StatefulSet"},
-	groupKind{group: "App", kind: "Service"},
-	groupKind{group: "App", kind: "Ingress"},
-	groupKind{group: "App", kind: "Configmap"}}
+	groupKind{group: "apps/v1", kind: "Deployment"},
+	groupKind{group: "apps/v1", kind: "StatefulSet"},
+	groupKind{group: "/v1", kind: "Service"},
+	groupKind{group: "networking.k8s.io/v1beta1", kind: "Ingress"},
+	groupKind{group: "/v1", kind: "Configmap"}}
 
 /* information about resource from which to auto-create applications */
 type autoCreateResourceInfo struct {
@@ -175,7 +175,7 @@ func stringToArrayOfLabelValues(inStr string) []string {
 /* Parse a resource from which to auto create applications
    unstructuredObj: object to be parsed
    Return an autoCreateResourceInfo  to represent the resource
-        Return  nil if the label kappnav.kappnav.app.auto-create is not set to true.
+        Return  nil if the label kappnav.app.auto-create is not set to true.
        Note: If parsing error occurs for annotations, default values are used.
 */
 func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *autoCreateResourceInfo {
