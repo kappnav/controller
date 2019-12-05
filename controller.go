@@ -151,9 +151,23 @@ func init() {
 		Resource: "routes",
 	}
 
+	coreIngressKind := &schema.GroupVersionResource{
+		Group:    "networking.k8s.io",
+		Version:  "v1beta1",
+		Resource: "ingresses",
+	}
+
+	coreIngressExtensionsKind := &schema.GroupVersionResource{
+		Group:    "extensions",
+		Version:  "v1beta1",
+		Resource: "ingresses",
+	}
+
 	coreKinds = make(map[schema.GroupVersionResource]bool)
 	coreKinds[*coreServiceKind] = true
 	coreKinds[*coreRouteKind] = true
+	coreKinds[*coreIngressKind] = true
+	coreKinds[*coreIngressExtensionsKind] = true
 }
 
 func logStack(msg string) {
