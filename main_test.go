@@ -106,23 +106,28 @@ const (
 func newComponentStatusFunc(ta *testActions, failRate float32) calculateComponentStatusFunc {
 	var testActs = ta
 	var failureRate = failRate
-	return func(destUrl string, componentKind string, namespace string, componentName string) (status string, flyover string, flyoverNLS string, retErr error) {
+	return func(destUrl string, resInfo *resourceInfo) (status string, flyover string, flyoverNLS string, retErr error) {
 		if rand.Float32() < failureRate {
-			return "", "", "", fmt.Errorf("In test %s, random error introduced when getting status for %s %s %s", testActs.testName, componentKind, namespace, componentName)
+			return "", "", "", fmt.Errorf("In test %s, random error introduced when getting status for %s %s %s", testActs.testName, resInfo.kind, resInfo.namespace, resInfo.name)
 		}
-		return testActs.getStatus(componentKind, namespace, componentName)
+		return testActs.getStatus(resInfo.kind, resInfo.namespace, resInfo.name)
 	}
 }
 
 // Create a new ClusterWatcher for unit test environment
 // pre-populating it with resources
 func createClusterWatcher(resources []resourceID, testActions *testActions, failureRate float32) (*ClusterWatcher, error) {
+	if klog.V(3) {
+		klog.Info("createClusterWatcher entry")
+	}
+
 	scheme := runtime.NewScheme()
 	dynClient := fake.NewSimpleDynamicClient(scheme)
 
 	fakeDiscovery := newFakeDiscovery()
 	err := populateResources(resources, dynClient, fakeDiscovery)
 	if err != nil {
+		klog.Info("createClusterWatcher exit nil")
 		return nil, err
 	}
 
@@ -131,12 +136,14 @@ func createClusterWatcher(resources []resourceID, testActions *testActions, fail
 	resController, err := NewClusterWatcher(plugin)
 	if err != nil {
 		if klog.V(3) {
-			klog.Infof("Error calling NewClusterWatcher: %s", err)
+			klog.Infof("createClusterWatcher Error calling NewClusterWatcher: %s", err)
 		}
 		return resController, err
 	}
 	testActions.setClusterWatcher(resController)
-
+	if klog.V(3) {
+		klog.Info("createClusterWatcher exit success")
+	}
 	return resController, nil
 }
 

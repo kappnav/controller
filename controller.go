@@ -297,7 +297,7 @@ func NewClusterWatcher(controllerPlugin *ControllerPlugin) (*ClusterWatcher, err
 	resController.plugin = controllerPlugin
 	resController.handlerMgr = newHandlerManager()
 	resController.nsFilter = newNamespaceFilter()
-	resController.gvrsToWatch = make(map[schema.GroupVersionResource]bool)
+	resController.gvrsToWatch = make(map[schema.GroupVersionResource]bool, 50)
 	resController.resourceMap = make(map[schema.GroupVersionResource]*ResourceWatcher, 50)
 
 	var err error
@@ -711,12 +711,12 @@ func (resController *ClusterWatcher) getResource(gvr schema.GroupVersionResource
 // add a new entry to resource map
 func (resController *ClusterWatcher) addResourceMapEntry(kind string, group string, version string, plural string, namespaced bool) {
 
-	if kind == "" || strings.HasPrefix(plural, "%") {
-		klog.Infof("addResourceMapEntry skipping resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
-		return
-	}
+	// if kind == "" || strings.HasPrefix(plural, "%") {
+	// 	klog.Infof("addResourceMapEntry skipping resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
+	// 	return
+	// }
 	if klog.V(3) {
-		klog.Infof("addResourceMapEntry adding resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
+		klog.Infof("addResourceMapEntry entry resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
 	}
 	var subResource string
 	if strings.Contains(plural, "/") {
@@ -754,6 +754,9 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 		// Watch the resource if it should be watched
 		resController.mutex.Unlock()
 		resController.restartWatch(rw.GroupVersionResource)
+	}
+	if klog.V(3) {
+		klog.Infof("addResourceMapEntry exit")
 	}
 }
 

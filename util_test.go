@@ -617,3 +617,25 @@ func TestExpressionsMatch(t *testing.T) {
 		}
 	}
 }
+
+func initAPIVersionKindToGVRMap() {
+	apiVersionKindToGVR.Store("v1/Service", coreServiceGVR)
+	apiVersionKindToGVR.Store("apps/v1/Deployment", coreDeploymentGVR)
+	apiVersionKindToGVR.Store("route.openshift.io/v1/Route", coreRouteGVR)
+	apiVersionKindToGVR.Store("v1/ConfigMap", coreConfigMapGVR)
+	apiVersionKindToGVR.Store("v1/Secret", coreSecretGVR)
+	apiVersionKindToGVR.Store("core/v1/Volume", coreVolumeGVR)
+	apiVersionKindToGVR.Store("v1/PersistentVolumeClaim", corePersistentVolumeClaimGVR)
+	apiVersionKindToGVR.Store("apiextensions.k8s.io/v1beta1/CustomResourceDefinition", coreCustomResourceDefinitionGVR)
+	apiVersionKindToGVR.Store("app.k8s.io/v1beta1/Application", coreApplicationGVR)
+	apiVersionKindToGVR.Store("apps/v1/StatefulSet", coreStatefulSetGVR)
+	apiVersionKindToGVR.Store("networking.k8s.io/v1beta1/Ingress", coreIngressGVR)
+	apiVersionKindToGVR.Store("batch/v1/Job", coreJobGVR)
+	apiVersionKindToGVR.Store("v1/ServiceAccount", coreServiceAccountGVR)
+	apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/ClusterRole", coreClusterRoleGVR)
+	apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/ClusterRoleBinding", coreClusterRoleBindingGVR)
+	apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/Role", coreRoleGVR)
+	apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/RoleBinding", coreRoleBindingGVR)
+	apiVersionKindToGVR.Store("storage.k8s.io/v1/StorageClass", coreStorageClassGVR)
+	apiVersionKindToGVR.Store("v1/Endpoint", coreEndpointGVR)
+}

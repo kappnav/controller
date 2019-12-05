@@ -18,6 +18,8 @@ package main
 
 import (
 	"fmt"
+	// "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
 	"testing"
 )
 
@@ -70,17 +72,25 @@ func TestStringToArrayOfAlphaNumeric(t *testing.T) {
 	}
 }
 
+func init() {
+	initAPIVersionKindToGVRMap()
+}
+
 /* Test auto create with default values
  */
 func autoCreateTestHelper(t *testing.T, testName string, kindsToCheckStatus map[string]bool, files []string, autoCreatedFiles []string) {
 
+	klog.Info("autoCreateTestHelper entry")
+
 	iteration0IDs, err := readResourceIDs(files)
+	klog.Info("autoCreateTestHelper after readResourceIDs")
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
 	iteration0AutoCreatedIDs, err := readResourceIDs(autoCreatedFiles)
+	klog.Info("autoCreateTestHelper after readResourceIDs 2")
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -88,13 +98,17 @@ func autoCreateTestHelper(t *testing.T, testName string, kindsToCheckStatus map[
 
 	/* Iteration 0: create resources, and check for auto-created */
 	testActions := newTestActions(testName, kindsToCheckStatus)
+	klog.Info("autoCreateTestHelper after newTestActions")
 	testActions.addIteration(iteration0IDs, iteration0AutoCreatedIDs)
+	klog.Info("autoCreateTestHelper after addIteration")
 
 	/* iteration 1: clean up. Delete resources, and check auto-created are deleted */
 	var emptyIDs = []resourceID{}
 	testActions.addIteration(emptyIDs, emptyIDs)
+	klog.Info("autoCreateTestHelper after addIteration empty ids")
 
 	clusterWatcher, err := createClusterWatcher(iteration0IDs, testActions, StatusFailureRate)
+	klog.Info("autoCreateTestHelper after createClusterWatcher")
 	if err != nil {
 		t.Fatal(err)
 		return

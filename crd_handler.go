@@ -23,7 +23,7 @@ import (
 // CRDNewHandler processes changes to Custom Resource Definitions
 var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
 	if klog.V(2) {
-		klog.Infof("CRDNewHandler entry rw: %v\n eventData function: %v", rw, eventData.funcType)
+		klog.Infof("CRDNewHandler entry eventData.funcType: %v resourceWatcher: %v", eventData.funcType, rw)
 	}
 	key := eventData.key
 	obj, exists, err := rw.store.GetByKey(key)
@@ -38,6 +38,9 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 	} else {
 		// add or modify GVR
 		gvr := resController.addGVR(obj)
+		if klog.V(4) {
+			klog.Infof("CRDNewHandler added GVR %s", gvr)
+		}
 		if eventData.funcType == AddFunc {
 			if gvr == coreApplicationGVR {
 				if klog.V(4) {
@@ -54,6 +57,9 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				}
 			}
 		}
+	}
+	if klog.V(4) {
+		klog.Infof("CRDNewHandler exit success")
 	}
 	return nil
 }

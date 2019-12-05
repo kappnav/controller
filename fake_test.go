@@ -73,6 +73,7 @@ func readOneResourceID(fileName string) (resourceID, error) {
 	var resource = resourceID{}
 	resource.fileName = fileName
 	resource.kind = resInfo.kind
+	resource.gvr = resInfo.gvr
 	resource.namespace = resInfo.namespace
 	resource.name = resInfo.name
 	resource.expectedStatus = Normal
@@ -121,7 +122,7 @@ func testPluralToKind(t *testing.T) {
 // Populate resources into fake dynamic client, and populate fake discovery
 func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interface, fakeDisc *fakeDiscovery) error {
 	if klog.V(3) {
-		klog.Info("populateResources")
+		klog.Info("populateResources entry")
 	}
 
 	for _, toCreate := range toCreateResources {
@@ -153,6 +154,9 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 		_, err = interf.Create(obj, metav1.CreateOptions{})
 
 		if err != nil {
+			if klog.V(3) {
+				klog.Infof("populateResources exit err %s", err)
+			}
 			return err
 		}
 		if klog.V(3) {
@@ -160,7 +164,7 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 		}
 	}
 	if klog.V(3) {
-		klog.Info("populateResources success")
+		klog.Info("populateResources exit success")
 	}
 	return nil
 }

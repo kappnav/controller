@@ -63,7 +63,7 @@ var defaultKinds = []groupKind{
 	groupKind{group: "apps/v1", kind: "StatefulSet"},
 	groupKind{group: "/v1", kind: "Service"},
 	groupKind{group: "networking.k8s.io/v1beta1", kind: "Ingress"},
-	groupKind{group: "/v1", kind: "Configmap"}}
+	groupKind{group: "/v1", kind: "ConfigMap"}}
 
 /* information about resource from which to auto-create applications */
 type autoCreateResourceInfo struct {
@@ -232,13 +232,28 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 				/* Transform array of string to array of groupKind */
 				resourceInfo.autoCreateKinds = make([]groupKind, 0, len(arrayOfString))
 				for _, val := range arrayOfString {
+					var group string
 					gvr, ok := resController.getWatchGVRForKind(val)
-					if !ok {
+					if ok {
+						group = gvr.Group + "/" + gvr.Version
 						if klog.V(4) {
-							klog.Infof("parseAutoCreateResourceInfo error getting GVR for kind: %s", val)
+							klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, val)
+						}
+					} else {
+						gvrDefault, ok := coreKindToGVR[val]
+						if ok {
+							group = gvrDefault.Group + "/" + gvrDefault.Version
+							if klog.V(4) {
+								klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
+							}
+						} else {
+							group = "App"
+							if klog.V(4) {
+								klog.Infof("parseAutoCreateResourceInfo no GVR found for kind: %s, using default group: App", val)
+							}
 						}
 					}
-					resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{"App", val, gvr})
+					resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, gvr})
 				}
 			}
 		}
