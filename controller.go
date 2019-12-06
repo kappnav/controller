@@ -150,7 +150,7 @@ func init() {
 		Version:  "v1",
 		Resource: "routes",
 	}
-	
+
 	coreIngressKind := &schema.GroupVersionResource{
 		Group:    "networking.k8s.io",
 		Version:  "v1beta1",
@@ -163,9 +163,9 @@ func init() {
 		Resource: "ingresses",
 	}
 
-	coreKinds = make(map[schema.GroupVersionResource]bool)		coreKinds = make(map[schema.GroupVersionResource]bool)
-	coreKinds[*coreServiceKind] = true		coreKinds[*coreServiceKind] = true
-	coreKinds[*coreRouteKind] = true		coreKinds[*coreRouteKind] = true
+	coreKinds = make(map[schema.GroupVersionResource]bool)
+	coreKinds[*coreServiceKind] = true
+	coreKinds[*coreRouteKind] = true
 	coreKinds[*coreIngressKind] = true
 	coreKinds[*coreIngressExtensionsKind] = true
 }
