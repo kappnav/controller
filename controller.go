@@ -292,6 +292,7 @@ type ClusterWatcher struct {
 	resourceMap         map[schema.GroupVersionResource]*ResourceWatcher // all resources being watched
 	gvrsToWatch         map[schema.GroupVersionResource]bool             // set of gvrs to watch for resources
 	apiVersionKindToGVR sync.Map
+	groupKindToGVR      sync.Map
 	statusPrecedence    []string // array of status precedence
 	unknownStatus       string   // value of unkown status
 	namespaces          map[string]string
@@ -625,46 +626,34 @@ func (resController *ClusterWatcher) getWatchGVR(gvr schema.GroupVersionResource
 	return schema.GroupVersionResource{}, false
 }
 
-// getGVRForGroupKind gets the GroupVersionResource for a kind and group
+// getGVRForGroupKind gets the GVR for a kind and group
 func (resController *ClusterWatcher) getGVRForGroupKind(inGroup string, kind string) (schema.GroupVersionResource, bool) {
 
-	// we do the magical mapping here
-
-	/**
-	if group does not have / (including "")
-	   if kind is core kind
-		  use core gvr for kind (ignore group)
-	   else
-		  error
-	else
-	   use gvr with specified group and kind
-	*/
-
-	if !strings.Contains(inGroup, "/") {
-		gvr, ok := coreKindToGVR[kind]
-		if ok {
-			if klog.V(2) {
-				klog.Infof("getGVRForGroupKind no group with kind: %s returning GVR: %v", kind, gvr)
-			}
-			return gvr, true
-		}
-		if klog.V(2) {
-			klog.Infof("getGVRForGroupKind no group with kind: %s is not a core kind, returning false", kind)
-		}
-		return schema.GroupVersionResource{}, false
+	// map group/kind to apiVersion
+	var group string
+	if inGroup == "core" {
+		group = ""
 	}
-	split := strings.Split(inGroup, "/")
-	apiVersionKind := split[1] + "/" + kind
-	if split[0] != "" {
-		apiVersionKind = split[0] + "/" + apiVersionKind
-	}
+	groupKind := group + "/" + kind
 	if klog.V(2) {
-		klog.Infof("getGVRForGroupKind using apiVersion/Kind: %s", apiVersionKind)
+		klog.Infof("getGVRForGroupKind trying group/Kind: %s", groupKind)
 	}
-	gvr, ok := resController.apiVersionKindToGVR.Load(apiVersionKind)
+	gvr, ok := resController.groupKindToGVR.Load(groupKind)
 	if ok {
 		if klog.V(2) {
 			klog.Infof("getGVRForGroupKind for group: %s kind: %s returning: %v", inGroup, kind, gvr.(schema.GroupVersionResource))
+		}
+		return gvr.(schema.GroupVersionResource), true
+	}
+	if klog.V(2) {
+		klog.Infof("getGVRForGroupKind WARNING: No CRD found with group: " + group + " for kind: " + kind)
+	}
+	// no CRDs installed with the specified group/kind
+	// See if it's one of the core kinds for compatibility
+	gvr, ok = coreKindToGVR[kind]
+	if ok {
+		if klog.V(2) {
+			klog.Infof("getGVRForGroupKind returning default GVR for group: %s kind: %s GVR: %v", inGroup, kind, gvr.(schema.GroupVersionResource))
 		}
 		return gvr.(schema.GroupVersionResource), true
 	}
@@ -744,6 +733,25 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 	apiVersionKind := version + "/" + kind
 	if group != "" {
 		apiVersionKind = group + "/" + apiVersionKind
+		groupKind := group + "/" + kind
+		// don't replace an existing entry for a core GVR
+		store := true
+		gvr, ok := resController.groupKindToGVR.Load(groupKind)
+		if ok {
+			coreGVR, ok := coreKindToGVR[kind]
+			if ok && coreGVR == gvr {
+				if klog.V(2) {
+					klog.Infof("addResourceMapEntry not repacing group/Kind map core GVR: %s with GVR: %s", coreGVR, gvr)
+				}
+				store = false
+			}
+		}
+		if store == true {
+			if klog.V(2) {
+				klog.Infof("addResourceMapEntry mapping group/Kind: %s to GVR: %s", groupKind, gvr)
+			}
+			resController.groupKindToGVR.Store(groupKind, gvr)
+		}
 	}
 	if klog.V(2) {
 		klog.Infof("addResourceMapEntry mapping apiVersion/Kind: %s to GVR: %s", apiVersionKind, gvr)
@@ -783,9 +791,27 @@ func (resController *ClusterWatcher) deleteResourceMapEntry(gvr schema.GroupVers
 	apiVersionKind := gvr.Version + "/" + kind
 	if gvr.Group != "" {
 		apiVersionKind = gvr.Group + "/" + apiVersionKind
+		groupKind := gvr.Group + "/" + kind
+		// don't delete an existing group/kind map entry for a different GVR (i.e. with a different version)
+		delete := true
+		existingGvr, ok := resController.groupKindToGVR.Load(groupKind)
+		if ok {
+			if ok && existingGvr != gvr {
+				if klog.V(2) {
+					klog.Infof("deleteResourceMapEntry group/Kind map GVR: %s is not the GVR to be deleted: %s", existingGvr, gvr)
+				}
+				delete = false
+			}
+		}
+		if delete == true {
+			if klog.V(2) {
+				klog.Infof("deleteResourceMapEntry deleting group/Kind: %s for GVR: %s", groupKind, gvr)
+			}
+			resController.groupKindToGVR.Delete(apiVersionKind)
+		}
 	}
 	if klog.V(2) {
-		klog.Infof("deleteResourceMapEntry using apiVersion/Kind: %s for GVR: %s", apiVersionKind, gvr)
+		klog.Infof("deleteResourceMapEntry deleting apiVersion/Kind: %s for GVR: %s", apiVersionKind, gvr)
 	}
 	resController.apiVersionKindToGVR.Delete(apiVersionKind)
 
@@ -828,7 +854,7 @@ func printAPIGroupList(list *metav1.APIGroupList) {
 	}
 }
 
-/* Initizlie list of resource group/api/version */
+/* Initialize list of resource group/api/version */
 func (resController *ClusterWatcher) initResourceMap() error {
 	if klog.V(2) {
 		klog.Infof("initResourceMap entry")
