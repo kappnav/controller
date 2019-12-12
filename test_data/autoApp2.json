@@ -23,15 +23,15 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "App",
+                "group": "apps",
                 "kind": "Deployment"
             },
             {
-                "group": "App",
+                "group": "core",
                 "kind": "Service"
             },
             {
-                "group": "App",
+                "group": "extensions",
                 "kind": "Ingress"
             }
         ],

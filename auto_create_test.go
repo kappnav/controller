@@ -113,7 +113,7 @@ func autoCreateTestHelper(t *testing.T, testName string, kindsToCheckStatus map[
  */
 func TestAutoCreateDefault(t *testing.T) {
 	testName := "TestAutoCreateDefault"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -138,7 +138,7 @@ func TestAutoCreateDefault(t *testing.T) {
  */
 func TestAutoCreateNonDefault1(t *testing.T) {
 	testName := "TestAutoCreateNonDefault1"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -162,7 +162,7 @@ func TestAutoCreateNonDefault1(t *testing.T) {
 
 func TestAutoCreateNonDefault2(t *testing.T) {
 	testName := "TestAutoCreateNonDefault2"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -185,7 +185,7 @@ func TestAutoCreateNonDefault2(t *testing.T) {
 
 func TestAutoCreateNonDefault3(t *testing.T) {
 	testName := "TestAutoCreateNonDefault3"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -208,7 +208,7 @@ func TestAutoCreateNonDefault3(t *testing.T) {
 
 func TestAutoCreateChangleLabel(t *testing.T) {
 	testName := "TestAutoCreateChangeLabel"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -276,7 +276,7 @@ func TestAutoCreateChangleLabel(t *testing.T) {
 
 func TestAutoCreateChangeName(t *testing.T) {
 	testName := "TestAutoCreateChangeName"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -353,7 +353,7 @@ func TestAutoCreateChangeName(t *testing.T) {
 
 func TestAutoCreateChangeAnnotation(t *testing.T) {
 	testName := "TestAutoCreateChangeAnnotation"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
@@ -430,7 +430,7 @@ func TestAutoCreateChangeAnnotation(t *testing.T) {
 
 func TestAutoCreateDeleteOrphan(t *testing.T) {
 	testName := "TestAutoCreateDeleteOrphan"
-
+	beforeTest()
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION:  true,
 		"Deployment": true,
@@ -467,7 +467,7 @@ func TestAutoCreateDeleteOrphan(t *testing.T) {
  */
 func TestAutoCreateStatefulSet(t *testing.T) {
 	testName := "TestAutoCreateStatefulSet"
-
+	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{
 		APPLICATION: true,
