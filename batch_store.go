@@ -210,22 +210,22 @@ func (ts *batchStore) putBack(resources *batchResources, putbackError error) {
 	for key, res := range resources.applications {
 		if _, ok := ts.store.applications[key]; !ok {
 			// not currently in the store
-			_, exists, err := ts.resController.getResource(res.gvr, res.namespace, res.name)
+			_, exists, err := ts.resController.getResource(res.kind, res.namespace, res.name)
 			if err != nil {
 				if klog.V(4) {
-					klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err)
+					klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.kind, res.namespace, res.name, err)
 				}
 			} else {
 				if exists {
 					// resource still exists. Put it back to be retried
 					if klog.V(4) {
-						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name)
+						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.kind, res.namespace, res.name)
 					}
 					ts.store.applications[key] = res
 					numPutBack++
 				} else {
 					if klog.V(4) {
-						klog.Infof("batchStor not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name)
+						klog.Infof("batchStor not putting back %s %s %s as it no longer exists\n", res.kind, res.namespace, res.name)
 					}
 				}
 			}
@@ -234,20 +234,20 @@ func (ts *batchStore) putBack(resources *batchResources, putbackError error) {
 	for key, res := range resources.nonApplications {
 		if _, ok := ts.store.nonApplications[key]; !ok {
 			// not currently in the store
-			_, exists, err := ts.resController.getResource(res.gvr, res.namespace, res.name)
+			_, exists, err := ts.resController.getResource(res.kind, res.namespace, res.name)
 			if err != nil {
-				klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err)
+				klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.kind, res.namespace, res.name, err)
 			} else {
 				if exists {
 					// resource still exists. Put it back to be retried
 					if klog.V(4) {
-						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name)
+						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.kind, res.namespace, res.name)
 					}
 					ts.store.nonApplications[key] = res
 					numPutBack++
 				} else {
 					if klog.V(4) {
-						klog.Infof("batchStore.putBack: not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name)
+						klog.Infof("batchStore.putBack: not putting back %s %s %s as it no longer exists\n", res.kind, res.namespace, res.name)
 					}
 				}
 			}

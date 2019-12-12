@@ -31,7 +31,7 @@ func sendResourceStatus(resController *ClusterWatcher, resInfo *resourceInfo, st
 	if klog.V(4) {
 		klog.Infof("sendResourceStatus %s set to %s\n", resInfo.name, status)
 	}
-	gvr, ok := resController.getWatchGVR(resInfo.gvr)
+	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -50,7 +50,7 @@ func sendResourceStatus(resController *ClusterWatcher, resInfo *resourceInfo, st
 		}
 
 		var resInfo = &resourceInfo{}
-		resController.parseResource(unstructuredObj, resInfo)
+		parseResource(unstructuredObj, resInfo)
 		if strings.Compare(resInfo.kappnavStatVal, status) != 0 {
 			// change status
 			if klog.V(2) {
@@ -225,14 +225,13 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 	// loop over all components kinds
 	for _, component := range componentKinds {
 		// loop over all resources of each component kind
-		gvr, ok := resController.getGVRForGroupKind(component.group, component.kind)
-		var resources = resController.listResources(gvr)
+		var resources = resController.listResources(component.kind)
 		for _, res := range resources {
 
 			var unstructuredObj = res.(*unstructured.Unstructured)
 
 			var resInfo = &resourceInfo{}
-			resController.parseResource(unstructuredObj, resInfo)
+			parseResource(unstructuredObj, resInfo)
 			if resourceComponentOfApplication(resController, appInfo, resInfo) {
 				// not self and labels match selector
 				if klog.V(4) {
@@ -290,7 +289,7 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 	if res, ok := hasStatus[key]; ok {
 		// status already computed
 		if klog.V(4) {
-			klog.Infof("processOneResource status already computed  %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+			klog.Infof("processOneResource status already computed  %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
 		}
 		return res.kappnavStatVal, nil
 	}
@@ -298,12 +297,12 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 	if ok {
 		// Resource has changed. Compute status from api Server
 		if klog.V(4) {
-			klog.Infof("processOneResource fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+			klog.Infof("processOneResource fetching status for %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
 		}
-		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo)
+		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo.kind, resInfo.namespace, resInfo.name)
 		if err != nil {
 			if klog.V(4) {
-				klog.Infof("processOneResource error fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+				klog.Infof("processOneResource error fetching status for %s %s %s\n", resInfo.kind, resInfo.namespace, resInfo.name)
 				klog.Infof("%v\n", err)
 			}
 			return stat, err

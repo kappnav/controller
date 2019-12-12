@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,48 +26,48 @@ import (
 
 func newNamespaceFilter() *namespaceFilter {
 	nsFilter := &namespaceFilter{
-		permitAllNamespaces: make(map[schema.GroupVersionResource]schema.GroupVersionResource),
-		namespacesForGVR:    make(map[schema.GroupVersionResource]map[string]string),
+		permitAllNamespaces: make(map[string]string),
+		namespacesForKind:   make(map[string]map[string]string),
 	}
 	return nsFilter
 }
 
 type namespaceFilter struct {
-	permitAllNamespaces map[schema.GroupVersionResource]schema.GroupVersionResource // gvrs for which all namespaces are processed
-	namespacesForGVR    map[schema.GroupVersionResource]map[string]string           // map from gvr to allowed namespaces
+	permitAllNamespaces map[string]string            // kinds for which all namespaces are processed
+	namespacesForKind   map[string]map[string]string // map from kind to alloned namespaces
 	mutex               sync.Mutex
 }
 
-/* Permit all namespaces for a gvr. Needs to be called during initialization */
-func (nsFilter *namespaceFilter) permitAllNamespacesForGVR(gvr schema.GroupVersionResource) {
+/* Permit all namespaces for a kind. Needs to be called during initialization */
+func (nsFilter *namespaceFilter) permitAllNamespacesForKind(kind string) {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
 	if klog.V(3) {
-		klog.Infof("permitAllNamesapceForGVR called for GVR %s", gvr)
+		klog.Infof("permitAllNamesapceForKind called for kind %s", kind)
 	}
-	nsFilter.permitAllNamespaces[gvr] = gvr
+	nsFilter.permitAllNamespaces[kind] = kind
 }
 
-/* Return true if all namespaces are permitted for gvr. Note: only the filter is checked.
+/* Return true if all namespaces are permitted for kind. Note: only the filter is checked.
 Whether the resource is not namepsaced is not checked.
 */
-func (nsFilter *namespaceFilter) isAllNamespacesPermitted(gvr schema.GroupVersionResource) bool {
+func (nsFilter *namespaceFilter) isAllNamespacesPermitted(kind string) bool {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
-	_, ok := nsFilter.permitAllNamespaces[gvr]
+	_, ok := nsFilter.permitAllNamespaces[kind]
 	return ok
 }
 
-/* Add a namespace for a gvr. Return true if newly added. Return false if it was previously added */
-func (nsFilter *namespaceFilter) addNamespaceForGVR(gvr schema.GroupVersionResource, namespace string) bool {
+/* Add a namespace for a kind. Return true if newly added. Return false if it was previously added */
+func (nsFilter *namespaceFilter) addNamespaceForKind(kind string, namespace string) bool {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
 
-	namespaces, ok := nsFilter.namespacesForGVR[gvr]
+	namespaces, ok := nsFilter.namespacesForKind[kind]
 	if !ok {
 		/* first namespace to be added */
 		namespaces = make(map[string]string)
-		nsFilter.namespacesForGVR[gvr] = namespaces
+		nsFilter.namespacesForKind[kind] = namespaces
 	}
 
 	_, ok = namespaces[namespace]
@@ -81,14 +80,14 @@ func (nsFilter *namespaceFilter) addNamespaceForGVR(gvr schema.GroupVersionResou
 	return true
 }
 
-/* permitNamespace adds a new namespace for given GVR to be processed for application
-   gvr: GVR for which to add namespace
-   namespace: namespace to add for processing the given GVR
+/* permitNamespace adds a new namespace for given kind to be processed for application
+   kind: kind for which to add namespace
+   namespace: namespace to add for processing the given kind
 */
-func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, gvr schema.GroupVersionResource, namespace string) {
+func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, kind string, namespace string) {
 
 	if klog.V(3) {
-		klog.Infof("permitNamespace GVR: %s, namespace: %s", gvr, namespace)
+		klog.Infof("permitNamespace kind: %s, namespace: %s", kind, namespace)
 	}
 
 	if !resController.isNamespacePermitted(namespace) {
@@ -99,36 +98,36 @@ func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, 
 		return
 	}
 
-	if !resController.isNamespaced(gvr) {
+	if !resController.isNamespaced(kind) {
 		// resource is not namespaced
 		if klog.V(3) {
-			klog.Infof("permitNamespaces GVR %s not namespaced", gvr)
+			klog.Infof("permitNamespaces kind %s not namespaced", kind)
 		}
 		return
 	}
 
-	if nsFilter.isAllNamespacesPermitted(gvr) {
+	if nsFilter.isAllNamespacesPermitted(kind) {
 		// already permitted for all namespaces
 		if klog.V(3) {
-			klog.Infof("permitNamespaces GVR %s permited for all namespaces", gvr)
+			klog.Infof("permitNamespaces kind %s permited for all namespaces", kind)
 		}
 		return
 	}
 
-	if ok := nsFilter.addNamespaceForGVR(gvr, namespace); ok {
-		/* first time adding this namespace. Replay cached objects of this gvr matching this namespace */
-		if gvr == coreApplicationGVR {
+	if ok := nsFilter.addNamespaceForKind(kind, namespace); ok {
+		/* first time adding this namespace. Replay cached objects of this kind matching this namespace */
+		if kind == APPLICATION {
 			/* applications already has its own handler for all namespaces */
 			if klog.V(3) {
-				klog.Infof("not replaying applications after adding namespace %s for gvr %s", namespace, gvr)
+				klog.Infof("not replaying applications after adding namespace %s for kind %s", namespace, kind)
 			}
 			return
 		}
 
-		var rw = resController.getResourceWatcher(gvr)
+		var rw = resController.getResourceWatcher(kind)
 		if rw != nil {
 			/* we are already watching the resoruce. */
-			var resources = resController.listResources(gvr)
+			var resources = resController.listResources(kind)
 			for _, resource := range resources {
 				key, err := cache.MetaNamespaceKeyFunc(resource)
 				if err == nil {
@@ -137,18 +136,18 @@ func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, 
 						/* resource in the namespace we want to include */
 						data := eventHandlerData{
 							funcType: AddFunc,
-							gvr:      gvr,
+							kind:     kind,
 							key:      key,
 							obj:      resource,
 							oldObj:   nil,
 						}
 						if klog.V(3) {
-							klog.Infof("replaying %s after adding namespace %s for GVR %s", key, namespace, gvr)
+							klog.Infof("replaying %s after adding namespace %s for kind %s", key, namespace, kind)
 						}
 						batchResourceHandler(resController, rw, &data)
 					} else {
 						if klog.V(3) {
-							klog.Infof("not replaying %s after adding namespace %s for GVR %s", key, namespace, gvr)
+							klog.Infof("not replaying %s after adding namespace %s for kind %s", key, namespace, kind)
 						}
 					}
 				}
@@ -183,41 +182,41 @@ func (nsFilter *namespaceFilter) shouldProcess(resController *ClusterWatcher, rw
 	defer nsFilter.mutex.Unlock()
 
 	if klog.V(3) {
-		klog.Infof("shouldProcess key: %s, gvr: %s", eventData.key, eventData.gvr)
+		klog.Infof("shouldProcess key: %s, kind: %s", eventData.key, eventData.kind)
 	}
 
 	// resource is not namespaced
 	if !rw.namespaced {
 		if klog.V(3) {
-			klog.Infof("shouldProcess true, gvr %s not namespaced", eventData.gvr)
+			klog.Infof("shouldProcess true, kind %s not namespaced", eventData.kind)
 		}
 		return true
 	}
 
-	if _, ok := nsFilter.permitAllNamespaces[eventData.gvr]; ok && resController.isAllNamespacesPermitted() {
+	if _, ok := nsFilter.permitAllNamespaces[eventData.kind]; ok && resController.isAllNamespacesPermitted() {
 		if klog.V(3) {
-			klog.Infof("shouldProcess true, gvr: %s is permited for all namespaces", eventData.gvr)
+			klog.Infof("shouldProcess true, kind: %s is permited for all namespaces", eventData.kind)
 		}
 		return true
 	}
 
-	namespaces, ok := nsFilter.namespacesForGVR[eventData.gvr]
+	namespaces, ok := nsFilter.namespacesForKind[eventData.kind]
 	if ok {
 		/* Allowed namespaces exist. Check if the namespace of the object is allowed. */
 		namespace, ok := getNamespace(eventData.obj)
 		if ok {
 			if _, ok := namespaces[namespace]; ok {
 				if klog.V(3) {
-					klog.Infof("shouldProcess true, gvr: %s is permited for namespace %s", eventData.gvr, namespace)
+					klog.Infof("shouldProcess true, kind: %s is permited for namespace %s", eventData.kind, namespace)
 				}
 				return true
 			}
 			if klog.V(3) {
-				klog.Infof("shouldProcess false gvr: %s is not permited for namespace %s", eventData.gvr, namespace)
+				klog.Infof("shouldProcess false kind: %s is not permited for namespace %s", eventData.kind, namespace)
 			}
 		}
 	} else if klog.V(3) {
-		klog.Infof("shouldProcess false no namespaces defined for gvr: %s ", eventData.gvr)
+		klog.Infof("shouldProcess false kind: %s error getting namespace", eventData.kind)
 	}
 	return false
 }

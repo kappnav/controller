@@ -227,7 +227,3 @@ func (sl *samplingLogger) logError(err error) {
 		klog.Error(err)
 	}
 }
-
-func logString(str string) string {
-	return "\"" + str + "\""
-}

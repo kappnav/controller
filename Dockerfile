@@ -72,4 +72,4 @@ WORKDIR /app
 
 # run with log level 2
 # Note liveness/readiness probe depends on './controller'
-CMD ./controller -v 9
+CMD ./controller -v 2
