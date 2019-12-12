@@ -1,5 +1,5 @@
 {
-    "apiVersion": "apps/v1",
+    "apiVersion": "extensions/v1beta1",
     "kind": "Deployment",
     "metadata": {
         "annotations": {
@@ -15,7 +15,7 @@
         "name": "reviews-v3",
         "namespace": "default",
         "resourceVersion": "1007640",
-        "selfLink": "/apis/apps/v1/namespaces/default/deployments/reviews-v3",
+        "selfLink": "/apis/extensions/v1beta1/namespaces/default/deployments/reviews-v3",
         "uid": "0c73245f-347d-11e9-9d73-0800275638b6"
     },
     "spec": {

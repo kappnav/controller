@@ -23,24 +23,24 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "apps",
+                "group": "App",
                 "kind": "Deployment"
             },
             {
-                "group": "apps",
+                "group": "App",
                 "kind": "StatefulSet"
             },
             {
-                "group": "core",
+                "group": "App",
                 "kind": "Service"
             },
             {
-                "group": "extensions",
+                "group": "App",
                 "kind": "Ingress"
             },
             {
-                "group": "core",
-                "kind": "ConfigMap"
+                "group": "App",
+                "kind": "Configmap"
             }
         ],
         "selector": {

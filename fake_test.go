@@ -69,17 +69,10 @@ func readOneResourceID(fileName string) (resourceID, error) {
 		return resourceID{}, fmt.Errorf("error in file %s, error: %s", fileName, err)
 	}
 	var resInfo = &resourceInfo{}
-	parseResourceBasic(unstructuredObj, resInfo)
+	parseResource(unstructuredObj, resInfo)
 	var resource = resourceID{}
 	resource.fileName = fileName
 	resource.kind = resInfo.kind
-	gvr, ok := coreKindToGVR[resInfo.kind]
-	if !ok {
-		if klog.V(2) {
-			klog.Infof("readOneResourceID no GVR found for kind: %s", resInfo.kind)
-		}
-	}
-	resource.gvr = gvr
 	resource.namespace = resInfo.namespace
 	resource.name = resInfo.name
 	resource.expectedStatus = Normal
@@ -128,7 +121,7 @@ func testPluralToKind(t *testing.T) {
 // Populate resources into fake dynamic client, and populate fake discovery
 func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interface, fakeDisc *fakeDiscovery) error {
 	if klog.V(3) {
-		klog.Info("populateResources entry")
+		klog.Info("populateResources")
 	}
 
 	for _, toCreate := range toCreateResources {
@@ -160,9 +153,6 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 		_, err = interf.Create(obj, metav1.CreateOptions{})
 
 		if err != nil {
-			if klog.V(3) {
-				klog.Infof("populateResources exit err %s", err)
-			}
 			return err
 		}
 		if klog.V(3) {
@@ -170,7 +160,7 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 		}
 	}
 	if klog.V(3) {
-		klog.Info("populateResources exit success")
+		klog.Info("populateResources success")
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
 {
-    "apiVersion": "apps/v1",
+    "apiVersion": "extensions/v1beta1",
     "kind": "Deployment",
     "metadata": {
         "annotations": {
@@ -15,7 +15,7 @@
         "name": "auto1",
         "namespace": "default",
         "resourceVersion": "452776",
-        "selfLink": "/apis/apps/v1/namespaces/default/deployments/auto1",
+        "selfLink": "/apis/extensions/v1beta1/namespaces/default/deployments/auto1",
         "uid": "3003609a-7d82-11e9-8623-00155de36603"
     },
     "spec": {
