@@ -70,6 +70,12 @@ COPY --chown=1001:0 testcntlr.sh /bin/testcntlr.sh
 USER 1001
 WORKDIR /app
 
+USER 0
+RUN microdnf install -y yum \
+    && yum update -y \
+    && microdnf remove yum
+USER 1001
+
 # run with log level 2
 # Note liveness/readiness probe depends on './controller'
 CMD ./controller -v 2
