@@ -23,11 +23,11 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "apps/v1",
+                "group": "apps",
                 "kind": "Deployment"
             },
             {
-                "group": "/v1",
+                "group": "core",
                 "kind": "Service"
             }
         ],

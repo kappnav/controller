@@ -59,11 +59,11 @@ const (
 
 /* default kinds for auto-created app*/
 var defaultKinds = []groupKind{
-	groupKind{group: "apps/v1", kind: "Deployment"},
-	groupKind{group: "apps/v1", kind: "StatefulSet"},
-	groupKind{group: "/v1", kind: "Service"},
-	groupKind{group: "networking.k8s.io/v1beta1", kind: "Ingress"},
-	groupKind{group: "/v1", kind: "ConfigMap"}}
+	groupKind{group: "apps", kind: "Deployment"},
+	groupKind{group: "apps", kind: "StatefulSet"},
+	groupKind{group: "core", kind: "Service"},
+	groupKind{group: "extensions", kind: "Ingress"},
+	groupKind{group: "core", kind: "ConfigMap"}}
 
 /* information about resource from which to auto-create applications */
 type autoCreateResourceInfo struct {
@@ -233,27 +233,59 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 				resourceInfo.autoCreateKinds = make([]groupKind, 0, len(arrayOfString))
 				for _, val := range arrayOfString {
 					var group string
-					gvr, ok := resController.getWatchGVRForKind(val)
-					if ok {
-						group = gvr.Group + "/" + gvr.Version
+					var kind string
+					var gvr schema.GroupVersionResource
+					// a / delimiter indicates the kappnav.app.auto-create.kinds anno entry is group/kind
+					split := strings.Split(val, "/")
+					if len(split) > 1 {
+						group = split[0]
+						kind = split[1]
 						if klog.V(4) {
-							klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, val)
+							klog.Infof("parseAutoCreateResourceInfo using group: %s kind: %s from kappnav.app.auto-create.kinds entry: %s", group, kind, val)
+						}
+						gvr, ok = resController.getWatchGVRForKind(kind)
+						if !ok {
+							gvr, ok = resController.getWatchGVRForKind(kind)
 						}
 					} else {
-						gvrDefault, ok := coreKindToGVR[val]
+						// no /, kappnav.app.auto-create.kinds anno entry is just a kind
+						kind = val
+						gvr, ok = resController.getWatchGVRForKind(kind)
 						if ok {
-							group = gvrDefault.Group + "/" + gvrDefault.Version
+							if gvr.Group == "" {
+								group = "core"
+							} else {
+								group = gvr.Group
+							}
 							if klog.V(4) {
-								klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
+								klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, kind)
 							}
 						} else {
-							group = "App"
-							if klog.V(4) {
-								klog.Infof("parseAutoCreateResourceInfo no GVR found for kind: %s, using default group: App", val)
+							gvr, ok = coreKindToGVR[val]
+							if ok {
+								if gvr.Group == "" {
+									group = "core"
+								} else {
+									group = gvr.Group
+								}
+								if klog.V(4) {
+									klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
+								}
+							} else {
+								group = "apps"
+								if klog.V(4) {
+									klog.Infof("parseAutoCreateResourceInfo no GVR found for kind: %s, using default group: apps", val)
+								}
 							}
 						}
 					}
-					resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, gvr})
+					if (gvr != schema.GroupVersionResource{}) {
+						resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, gvr})
+					} else {
+						if klog.V(4) {
+							klog.Infof("parseAutoCreateResourceInfo no GVR found for kappnav.app.auto-create.kinds entry: %s, skipping", val)
+						}
+					}
 				}
 			}
 		}

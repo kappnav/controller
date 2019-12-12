@@ -111,7 +111,7 @@ const (
 **/
 
 var coreNetworkPolicyGVR = schema.GroupVersionResource{
-	Group:    "networking.k8s.io",
+	Group:    "extensions",
 	Version:  "v1beta1",
 	Resource: "networkpolicies",
 }
@@ -144,8 +144,8 @@ func initControllerMaps(resController *ClusterWatcher) {
 	resController.apiVersionKindToGVR.Store("apiextensions.k8s.io/v1beta1/CustomResourceDefinition", coreCustomResourceDefinitionGVR)
 	resController.apiVersionKindToGVR.Store("app.k8s.io/v1beta1/Application", coreApplicationGVR)
 	resController.apiVersionKindToGVR.Store("apps/v1/StatefulSet", coreStatefulSetGVR)
-	resController.apiVersionKindToGVR.Store("networking.k8s.io/v1beta1/Ingress", coreIngressGVR)
-	resController.apiVersionKindToGVR.Store("networking.k8s.io/v1beta1/NetworkPolicy", coreNetworkPolicyGVR)
+	resController.apiVersionKindToGVR.Store("extensions/v1beta1/Ingress", coreIngressGVR)
+	resController.apiVersionKindToGVR.Store("extensions/v1beta1/NetworkPolicy", coreNetworkPolicyGVR)
 	resController.apiVersionKindToGVR.Store("samplecontroller.k8s.io/v1alpha1/Foo", coreFooGVR)
 	resController.apiVersionKindToGVR.Store("batch/v1/Job", coreJobGVR)
 	resController.apiVersionKindToGVR.Store("v1/ServiceAccount", coreServiceAccountGVR)

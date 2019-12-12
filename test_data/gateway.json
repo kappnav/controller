@@ -1,5 +1,5 @@
 {
-    "apiVersion": "networking.k8s.io/v1beta1",
+    "apiVersion": "extensions/v1beta1",
     "kind": "Ingress",
     "metadata": {
         "annotations": {
@@ -13,7 +13,7 @@
         "name": "gateway",
         "namespace": "default",
         "resourceVersion": "1007542",
-        "selfLink": "/apis/networking.k8s.io/v1beta1/namespaces/default/ingresses/gateway",
+        "selfLink": "/apis/extensions/v1beta1/namespaces/default/ingresses/gateway",
         "uid": "0c775e4b-347d-11e9-9d73-0800275638b6"
     },
     "spec": {

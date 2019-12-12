@@ -23,23 +23,23 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "apps/v1",
+                "group": "apps",
                 "kind": "Deployment"
             },
             {
-                "group": "apps/v1",
+                "group": "apps",
                 "kind": "StatefulSet"
             },
             {
-                "group": "/v1",
+                "group": "core",
                 "kind": "Service"
             },
             {
-                "group": "networking.k8s.io/v1beta1",
+                "group": "extensions",
                 "kind": "Ingress"
             },
             {
-                "group": "/v1",
+                "group": "core",
                 "kind": "ConfigMap"
             }
         ],

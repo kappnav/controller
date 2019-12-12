@@ -1,5 +1,5 @@
 {
-    "apiVersion": "networking.k8s.io/v1beta1",
+    "apiVersion": "extensions/v1beta1",
     "kind": "NetworkPolicy",
     "metadata": {
         "creationTimestamp": "2019-02-19T19:32:09Z",
@@ -10,7 +10,7 @@
         "name": "productpage-egress",
         "namespace": "default",
         "resourceVersion": "1007598",
-        "selfLink": "/apis/networking.k8s.io/v1beta1/namespaces/default/networkpolicies/productpage-egress",
+        "selfLink": "/apis/extensions/v1beta1/namespaces/default/networkpolicies/productpage-egress",
         "uid": "0c881103-347d-11e9-9d73-0800275638b6"
     },
     "spec": {

@@ -136,6 +136,9 @@ const (
 	kappnavComponentNamespaces = "kappnav.component.namespaces" // annotation for additional namespaces for application components
 )
 
+// coreKindToGVR map is for backward compatibility with initial releases
+// of KAppNav where specifying kind was enough. It maps a kind string
+// to the default GVR for the kind.
 var (
 	coreKindToGVR map[string]schema.GroupVersionResource
 
@@ -160,7 +163,7 @@ var (
 		Resource: "secrets",
 	}
 	coreVolumeGVR = schema.GroupVersionResource{
-		Group:    "core",
+		Group:    "",
 		Version:  "v1",
 		Resource: "volumes",
 	}
@@ -185,7 +188,7 @@ var (
 		Resource: "statefulsets",
 	}
 	coreIngressGVR = schema.GroupVersionResource{
-		Group:    "networking.k8s.io",
+		Group:    "extensions",
 		Version:  "v1beta1",
 		Resource: "ingresses",
 	}
