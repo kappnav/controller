@@ -59,11 +59,11 @@ const (
 
 /* default kinds for auto-created app*/
 var defaultKinds = []groupKind{
-	groupKind{group: "App", kind: "Deployment"},
-	groupKind{group: "App", kind: "StatefulSet"},
-	groupKind{group: "App", kind: "Service"},
-	groupKind{group: "App", kind: "Ingress"},
-	groupKind{group: "App", kind: "Configmap"}}
+	groupKind{group: "apps", kind: "Deployment"},
+	groupKind{group: "apps", kind: "StatefulSet"},
+	groupKind{group: "core", kind: "Service"},
+	groupKind{group: "extensions", kind: "Ingress"},
+	groupKind{group: "core", kind: "ConfigMap"}}
 
 /* information about resource from which to auto-create applications */
 type autoCreateResourceInfo struct {
@@ -175,13 +175,13 @@ func stringToArrayOfLabelValues(inStr string) []string {
 /* Parse a resource from which to auto create applications
    unstructuredObj: object to be parsed
    Return an autoCreateResourceInfo  to represent the resource
-        Return  nil if the label kappnav.kappnav.app.auto-create is not set to true.
+        Return  nil if the label kappnav.app.auto-create is not set to true.
        Note: If parsing error occurs for annotations, default values are used.
 */
-func parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *autoCreateResourceInfo {
+func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *autoCreateResourceInfo {
 
 	resourceInfo := &autoCreateResourceInfo{}
-	parseResource(unstructuredObj, &resourceInfo.resourceInfo)
+	resController.parseResource(unstructuredObj, &resourceInfo.resourceInfo)
 
 	autoCreate, ok := resourceInfo.resourceInfo.labels[AppAutoCreate]
 	if !ok {
@@ -232,7 +232,60 @@ func parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *au
 				/* Transform array of string to array of groupKind */
 				resourceInfo.autoCreateKinds = make([]groupKind, 0, len(arrayOfString))
 				for _, val := range arrayOfString {
-					resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{"App", val})
+					var group string
+					var kind string
+					var gvr schema.GroupVersionResource
+					// a / delimiter indicates the kappnav.app.auto-create.kinds anno entry is group/kind
+					split := strings.Split(val, "/")
+					if len(split) > 1 {
+						group = split[0]
+						kind = split[1]
+						if klog.V(4) {
+							klog.Infof("parseAutoCreateResourceInfo using group: %s kind: %s from kappnav.app.auto-create.kinds entry: %s", group, kind, val)
+						}
+						gvr, ok = resController.getWatchGVRForKind(kind)
+						if !ok {
+							gvr, ok = resController.getWatchGVRForKind(kind)
+						}
+					} else {
+						// no /, kappnav.app.auto-create.kinds anno entry is just a kind
+						kind = val
+						gvr, ok = resController.getWatchGVRForKind(kind)
+						if ok {
+							if gvr.Group == "" {
+								group = "core"
+							} else {
+								group = gvr.Group
+							}
+							if klog.V(4) {
+								klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, kind)
+							}
+						} else {
+							gvr, ok = coreKindToGVR[val]
+							if ok {
+								if gvr.Group == "" {
+									group = "core"
+								} else {
+									group = gvr.Group
+								}
+								if klog.V(4) {
+									klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
+								}
+							} else {
+								group = "apps"
+								if klog.V(4) {
+									klog.Infof("parseAutoCreateResourceInfo no GVR found for kind: %s, using default group: apps", val)
+								}
+							}
+						}
+					}
+					if (gvr != schema.GroupVersionResource{}) {
+						resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, gvr})
+					} else {
+						if klog.V(4) {
+							klog.Infof("parseAutoCreateResourceInfo no GVR found for kappnav.app.auto-create.kinds entry: %s, skipping", val)
+						}
+					}
 				}
 			}
 		}
@@ -300,14 +353,14 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 			klog.Infof("autoCreateAppHandler Processing %d old object : %s", eventData.funcType, eventData.oldObj.(*unstructured.Unstructured))
 		}
 	}
-	resourceInfo := parseAutoCreateResourceInfo(eventData.obj.(*unstructured.Unstructured))
+	resourceInfo := resController.parseAutoCreateResourceInfo(eventData.obj.(*unstructured.Unstructured))
 	if resourceInfo == nil {
 		if klog.V(5) {
 			klog.Infof("autoCreateAppHandler: not a resource to auto-create")
 		}
 		// not an auto-create resource
 		if eventData.funcType == UpdateFunc {
-			oldResInfo := parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
+			oldResInfo := resController.parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
 			if oldResInfo != nil {
 				/* Went from auto-created to not auto-created */
 				if klog.V(2) {
@@ -331,7 +384,7 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 		}
 
 		if eventData.funcType == UpdateFunc {
-			oldResInfo := parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
+			oldResInfo := resController.parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
 			if oldResInfo != nil {
 				if oldResInfo.autoCreateName != resourceInfo.autoCreateName {
 					if klog.V(2) {
@@ -406,7 +459,7 @@ func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw 
 		klog.Infof("Deleting auto-created application %s/%s", resInfo.namespace, resInfo.autoCreateName)
 	}
 
-	gvr, ok := resController.getGroupVersionResource(APPLICATION)
+	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -454,7 +507,7 @@ func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatc
 	if klog.V(4) {
 		klog.Infof("autoCreateModifyApplication from %s/%s", resInfo.resourceInfo.namespace, resInfo.resourceInfo.name)
 	}
-	gvr, ok := resController.getGroupVersionResource(APPLICATION)
+	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -589,7 +642,7 @@ func createApplication(resController *ClusterWatcher, rw *ResourceWatcher, resIn
 	if klog.V(4) {
 		klog.Infof("Creating application %s/%s, from %s", resInfo.namespace, resInfo.autoCreateName, resInfo.name)
 	}
-	gvr, ok := resController.getGroupVersionResource(APPLICATION)
+	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -788,7 +841,7 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 	// check if component kinds have changed
 	if !sameComponentKinds(appResInfo.componentKinds, resInfo.autoCreateKinds) {
 		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate component kinds mismatch. In app: %s In original resource: %s", appResInfo.componentKinds, resInfo.autoCreateKinds)
+			klog.Infof("auttoCreatedApplicationNeedsUpdate component kinds mismatch. In app: %v In original resource: %v", appResInfo.componentKinds, resInfo.autoCreateKinds)
 		}
 		return true
 	}
@@ -876,7 +929,7 @@ func deleteOrphanedAutoCreatedApplications(resController *ClusterWatcher) error 
 		klog.Infof("Deleting orphaned auto-crated application\n")
 	}
 
-	gvr, ok := resController.getGroupVersionResource(APPLICATION)
+	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if !ok {
 		err := fmt.Errorf("Unable to get GVR for Application")
 		klog.Errorf("Error in deleteOrphanedAutoCreatedApplications: %s", err)
@@ -918,7 +971,7 @@ func deleteOrphanedAutoCreatedApplications(resController *ClusterWatcher) error 
 			continue
 		}
 
-		fromGVR, ok := resController.getGroupVersionResource(fromKind)
+		fromGVR, ok := resController.getWatchGVRForKind(fromKind)
 		if !ok {
 			if klog.V(5) {
 				klog.Errorf("Error in deleteOrphanedAutoCreatedApplications: Unable to find GVR for %s", fromKind)

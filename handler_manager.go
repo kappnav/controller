@@ -17,71 +17,72 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
 )
 
-// HandlersForOneKind contains event handlers for one kind of resource
-type HandlersForOneKind struct {
+// HandlersForOneGVR contains event handlers for one GVR
+type HandlersForOneGVR struct {
 	primaryHandler *resourceActionFunc   // primary handler to be called. Otherwise, defaultPrimaryHandler is called.
 	otherHandlers  []*resourceActionFunc // other handlers to be called
 }
 
-// HandlerManager contains event handlers for all kinds
+// HandlerManager contains event handlers for all GVRs
 type HandlerManager struct {
 	defaultPrimaryHandler *resourceActionFunc
-	handlers              map[string]*HandlersForOneKind
+	handlers              map[schema.GroupVersionResource]*HandlersForOneGVR
 }
 
 /* Create a new handler manager
- * defaultPrimaryHandler: default primary handler if none is set for a kind
+ * defaultPrimaryHandler: default primary handler if none is set for a GVR
  */
 func newHandlerManager() *HandlerManager {
 	ret := &HandlerManager{
 		defaultPrimaryHandler: &namespaceFilterHandler,
-		handlers:              make(map[string]*HandlersForOneKind)}
+		handlers:              make(map[schema.GroupVersionResource]*HandlersForOneGVR)}
 
-	ret.setPrimaryHandler(APPLICATION, &batchApplicationHandler)
-	ret.setPrimaryHandler(CustomResourceDefinition, &CRDNewHandler)
-	ret.addOtherHandler(DEPLOYMENT, &autoCreateAppHandler)
-	ret.addOtherHandler(STATEFULSET, &autoCreateAppHandler)
+	ret.setPrimaryHandler(coreApplicationGVR, &batchApplicationHandler)
+	ret.setPrimaryHandler(coreCustomResourceDefinitionGVR, &CRDNewHandler)
+	ret.addOtherHandler(coreDeploymentGVR, &autoCreateAppHandler)
+	ret.addOtherHandler(coreStatefulSetGVR, &autoCreateAppHandler)
 	return ret
 }
 
-/* Set the primary handler for a kind
+/* Set the primary handler for a GVR
  */
-func (mgr *HandlerManager) setPrimaryHandler(kind string, primaryHandler *resourceActionFunc) {
-	handlersForKind := mgr.handlers[kind]
-	if handlersForKind == nil {
-		handlersForKind = &HandlersForOneKind{
+func (mgr *HandlerManager) setPrimaryHandler(gvr schema.GroupVersionResource, primaryHandler *resourceActionFunc) {
+	handlersForGVR := mgr.handlers[gvr]
+	if handlersForGVR == nil {
+		handlersForGVR = &HandlersForOneGVR{
 			primaryHandler: primaryHandler,
 			otherHandlers:  make([]*resourceActionFunc, 0)}
-		mgr.handlers[kind] = handlersForKind
+		mgr.handlers[gvr] = handlersForGVR
 	} else {
-		handlersForKind.primaryHandler = primaryHandler
+		handlersForGVR.primaryHandler = primaryHandler
 	}
 }
 
-/* Add other handlers for a kind
+/* Add other handlers for a GVR
  */
-func (mgr *HandlerManager) addOtherHandler(kind string, handler *resourceActionFunc) {
-	handlersForKind := mgr.handlers[kind]
-	if handlersForKind == nil {
-		handlersForKind = &HandlersForOneKind{
+func (mgr *HandlerManager) addOtherHandler(gvr schema.GroupVersionResource, handler *resourceActionFunc) {
+	handlersForGVR := mgr.handlers[gvr]
+	if handlersForGVR == nil {
+		handlersForGVR = &HandlersForOneGVR{
 			primaryHandler: nil,
 			otherHandlers:  []*resourceActionFunc{}}
-		mgr.handlers[kind] = handlersForKind
+		mgr.handlers[gvr] = handlersForGVR
 	}
-	handlersForKind.otherHandlers = append(handlersForKind.otherHandlers, handler)
+	handlersForGVR.otherHandlers = append(handlersForGVR.otherHandlers, handler)
 }
 
-/* Call all the handlers for a kind
+/* Call all the handlers for a GVR
  */
-func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
+func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
 
 	if klog.V(4) {
-		klog.Infof("callHandlers entry %s %v\n", kind, eventData)
+		klog.Infof("callHandlers entry %s %v\n", gvr, eventData)
 	}
-	handler := mgr.handlers[kind]
+	handler := mgr.handlers[gvr]
 	// TODO: can this be done better? For now, We just accumulate one error and log the rest
 	var err error
 	if handler != nil {
@@ -92,7 +93,7 @@ func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatch
 				err1 := (*handler.primaryHandler)(resController, rw, eventData)
 				if err1 != nil {
 					err = err1
-					klog.Errorf("Error calling primary handler for kind %s, error: %s", kind, err)
+					klog.Errorf("Error calling primary handler for gvr %s, error: %s", gvr, err)
 				}
 			}
 		} else {
@@ -101,7 +102,7 @@ func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatch
 			err2 := (*mgr.defaultPrimaryHandler)(resController, rw, eventData)
 			if err2 != nil {
 				err = err2
-				klog.Errorf("Error calling default primary handler for kind %s, error: %s", kind, err)
+				klog.Errorf("Error calling default primary handler for gvr %s, error: %s", gvr, err)
 			}
 		}
 		if resController.isEventPermitted(eventData) {
@@ -111,18 +112,18 @@ func (mgr *HandlerManager) callHandlers(kind string, resController *ClusterWatch
 				err3 := (*otherHandler)(resController, rw, eventData)
 				if err3 != nil {
 					err = err3
-					klog.Errorf("Error calling other handler for kind %s, error: %s", kind, err)
+					klog.Errorf("Error calling other handler for gvr %s, error: %s", gvr, err)
 				}
 			}
 		}
 	} else {
-		// Kinds: Application component kinds that are NOT one of the following:
+		// Kinds: Application componentKinds that are NOT one of the following:
 		//    Application, CustomResourceDefinition, Deployment or StatefulSet
 		// Call namespaceFilterHandler > batchResourceHandler
 		err4 := (*mgr.defaultPrimaryHandler)(resController, rw, eventData)
 		if err4 != nil {
 			err = err4
-			klog.Errorf("Error calling default primary handler for kind %s, error: %s", kind, err)
+			klog.Errorf("Error calling default primary handler for gvr %s, error: %s", gvr, err)
 		}
 	}
 	if klog.V(4) {

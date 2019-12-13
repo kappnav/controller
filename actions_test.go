@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +32,7 @@ import (
 
 // Check whether a resource exists
 func resourceExists(resController *ClusterWatcher, resInfo resourceID) (bool, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -49,11 +50,11 @@ func resourceExists(resController *ClusterWatcher, resInfo resourceID) (bool, er
 
 		return true, nil
 	}
-	return false, fmt.Errorf("Unable to find GVR for kind %s", resInfo.kind)
+	return false, fmt.Errorf("resourceExists Unable to find GVR for kind %s", resInfo.kind)
 }
 
 func getResource(resController *ClusterWatcher, resInfo resourceID) (*unstructured.Unstructured, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -70,12 +71,12 @@ func getResource(resController *ClusterWatcher, resInfo resourceID) (*unstructur
 		}
 		return unstructuredObj, err
 	}
-	return nil, fmt.Errorf("Unable to find GVR for kind %s", resInfo.kind)
+	return nil, fmt.Errorf("getResource Unable to find GVR for kind %s", resInfo.kind)
 }
 
 // get kappnav status of resource
 func resourcekAppNavStatus(resController *ClusterWatcher, resInfo resourceID) (string, error) {
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -91,12 +92,11 @@ func resourcekAppNavStatus(resController *ClusterWatcher, resInfo resourceID) (s
 			return "", err
 		}
 		var resInfo = &resourceInfo{}
-		parseResource(unstructuredObj, resInfo)
+		resController.parseResource(unstructuredObj, resInfo)
 		return resInfo.kappnavStatVal, nil
 
 	}
-	//return "", errors.New(fmt.Sprintf("Unable to find GVR for kind %s", resInfo.kind))
-	return "", fmt.Errorf("Unable to find GVR for kind %s", resInfo.kind)
+	return "", fmt.Errorf("resourcekAppNavStatus Unable to find GVR for kind %s", resInfo.kind)
 }
 
 /*
@@ -145,28 +145,41 @@ func waitForkAppNavAutoDelete(ctx context.Context, cancel context.CancelFunc, te
 }
 
 func sameAutoCreatedApplication(actual *appResourceInfo, expected *appResourceInfo) bool {
+	ret := true
 	if !sameLabels(actual.labels, expected.labels) {
-		return false
+		if klog.V(2) {
+			klog.Info("sameAutoCreatedApplication labels different")
+		}
+		ret = false
 	}
 
 	if actual.annotations[AppAutoCreatedFromName] != expected.annotations[AppAutoCreatedFromName] {
-		return false
-	}
-	if actual.annotations[AppAutoCreatedFromName] != expected.annotations[AppAutoCreatedFromName] {
-		return false
+		if klog.V(2) {
+			klog.Info("sameAutoCreatedApplication kappnav.app.auto-created.from.name different")
+		}
+		ret = false
 	}
 
 	if !sameComponentKinds(actual.componentKinds, expected.componentKinds) {
-		return false
+		if klog.V(2) {
+			klog.Info("sameAutoCreatedApplication componentKinds different")
+		}
+		ret = false
 	}
 
 	if !sameLabels(actual.matchLabels, expected.matchLabels) {
-		return false
+		if klog.V(2) {
+			klog.Info("sameAutoCreatedApplication matchLabels different")
+		}
+		ret = false
 	}
 	if !sameMatchExpressions(actual.matchExpressions, expected.matchExpressions) {
-		return false
+		if klog.V(2) {
+			klog.Info("sameAutoCreatedApplication matchExpressions different")
+		}
+		ret = false
 	}
-	return true
+	return ret
 }
 
 func waitForkAppNavAutoCreateModify(ctx context.Context, cancel context.CancelFunc, testName string, iteration int, resController *ClusterWatcher, resInfo resourceID) error {
@@ -216,7 +229,7 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 		return nil
 	}
 
-	gvr, ok := resController.getGroupVersionResource(resInfo.kind)
+	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
 		var intf dynamic.ResourceInterface
@@ -258,8 +271,7 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 			return err
 		}
 	} else {
-		//   return errors.New(fmt.Sprintf("Unable to find GVR for kind %s", resInfo.kind))
-		return fmt.Errorf("Unable to find GVR for kind %s", resInfo.kind)
+		return fmt.Errorf("modifyResource Unable to find GVR for kind %s", resInfo.kind)
 	}
 
 	return nil
@@ -399,6 +411,7 @@ type resourceID struct {
 	resInfo   *resourceInfo
 	namespace string
 	kind      string
+	gvr       schema.GroupVersionResource
 	name      string
 	fileName  string
 	// expected status
@@ -515,6 +528,7 @@ func transitionHelper(ta *testActions) error {
 	for _, resToDelete := range toDelete {
 		var resInfo = &resourceInfo{}
 		resInfo.kind = resToDelete.kind
+		resInfo.gvr = resToDelete.gvr
 		resInfo.namespace = resToDelete.namespace
 		resInfo.name = resToDelete.name
 
