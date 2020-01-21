@@ -6,4 +6,4 @@ The controller component is the Kubernetes controller for Application Naviagator
 
 ## build
 
-Build this component by running it's build.sh script in the project root directory. 
+Build this component by running its build.sh script in the project root directory. 
