@@ -874,31 +874,46 @@ func (resController *ClusterWatcher) initResourceMap() error {
 	var groups = apiGroups.Groups
 	var group metav1.APIGroup
 	for _, group = range groups {
-		// fmt.Println(group.PreferredVersion.GroupVersion)
-		apiResourceList, err := discClient.ServerResourcesForGroupVersion(group.PreferredVersion.GroupVersion)
-		if err != nil {
-			// If this is not available, then disregrad it
-			klog.Errorf("initResourceMap unable to get information about APIGroup %s, skipping", group)
-			continue
-		}
-		groupVersion := group.PreferredVersion.GroupVersion
-		var group string
-		var version string
-		if strings.Contains(groupVersion, "/") {
-			gv := strings.Split(groupVersion, "/")
-			group = gv[0]
-			version = gv[1]
+		// Special case for kube 1.16 / OCP 4.3 which added apiextensions.k8s.io/v1
+		// so can't use only the preferred version.
+		// TODO: Probably should handle all versions of all resources, more test needed first
+		if group.Name == "apiextensions.k8s.io" {
+			for i := 0; i < len(group.Versions); i++ {
+				if klog.V(2) {
+					klog.Infof("initResourceMap processing apiextensions.k8s.io GroupVersion %s", group.Versions[i].GroupVersion)
+				}
+				resController.processResourceGroup(group.Versions[i].GroupVersion, discClient)
+			}
 		} else {
-			group = ""
-			version = groupVersion
-		}
-		for _, apiResource := range apiResourceList.APIResources {
-			var plural = apiResource.Name
-			resController.addResourceMapEntry(apiResource.Kind, group, version, plural, apiResource.Namespaced)
+			resController.processResourceGroup(group.PreferredVersion.GroupVersion, discClient)
 		}
 	}
 	if klog.V(2) {
 		klog.Infof("initResourceMap exit")
+	}
+	return nil
+}
+
+func (resController *ClusterWatcher) processResourceGroup(groupVersion string, discClient discovery.DiscoveryInterface) error {
+	apiResourceList, err := discClient.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		// If this groupVersion is not available, then disregard it
+		klog.Errorf("initResourceMap unable to get information about APIGroup %s, skipping", groupVersion)
+		return err
+	}
+	var group string
+	var version string
+	if strings.Contains(groupVersion, "/") {
+		gv := strings.Split(groupVersion, "/")
+		group = gv[0]
+		version = gv[1]
+	} else {
+		group = ""
+		version = groupVersion
+	}
+	for _, apiResource := range apiResourceList.APIResources {
+		var plural = apiResource.Name
+		resController.addResourceMapEntry(apiResource.Kind, group, version, plural, apiResource.Namespaced)
 	}
 	return nil
 }
