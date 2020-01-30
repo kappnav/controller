@@ -1,4 +1,4 @@
-# Copyright 2019 IBM Corporation
+# Copyright 2019, 2020 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,6 +63,10 @@ RUN microdnf -y install shadow-utils \
     && mkdir /app \
     && chown 1001:0 /app \
     && chmod g+rwx /app
+
+RUN microdnf install -y yum \
+    && yum update -y \
+    && microdnf remove yum
 
 COPY --from=builder --chown=1001:0 /go/src/github.com/kappnav/controller/controller /app
 COPY --chown=1001:0 licenses/ /licenses/
