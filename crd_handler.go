@@ -17,8 +17,50 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
 )
+
+const (
+	// LibertyApp kind
+	LibertyApp = "Liberty-App"
+	// LibertyCollective kind
+	LibertyCollective = "Liberty-Collective"
+	// WasNdCell kind
+	WasNdCell = "WAS-ND-Cell"
+	// WasTraditionalApp kind
+	WasTraditionalApp = "WAS-Traditional-App"
+)
+
+var (
+	coreLibertyAppGVR = schema.GroupVersionResource{
+		Group:    "kappnav.io",
+		Version:  "v1beta1",
+		Resource: "liberty-apps",
+	}
+	coreLibertyCollectiveGVR = schema.GroupVersionResource{
+		Group:    "kappnav.io",
+		Version:  "v1beta1",
+		Resource: "liberty-collectives",
+	}
+	coreWasTraditionalAppGVR = schema.GroupVersionResource{
+		Group:    "kappnav.io",
+		Version:  "v1beta1",
+		Resource: "was-traditional-apps",
+	}
+	coreWasNDCellGVR = schema.GroupVersionResource{
+		Group:    "kappnav.io",
+		Version:  "v1beta1",
+		Resource: "was-nd-cells",
+	}
+)
+
+func init() {
+	coreKindToGVR["WAS-Traditional-App"] = coreWasTraditionalAppGVR
+	coreKindToGVR["WAS-ND-Cell"] = coreWasNDCellGVR
+	coreKindToGVR["Liberty-Collective"] = coreLibertyCollectiveGVR
+	coreKindToGVR["Liberty-App"] = coreLibertyAppGVR
+}
 
 // CRDNewHandler processes changes to Custom Resource Definitions
 var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
@@ -33,7 +75,6 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 	}
 	if !exists {
 		// a CRD has been deleted
-		
 		if klog.V(4) {
 			klog.Infof("CRDNewHandler a CRD has been deleted")
 		}
@@ -53,11 +94,26 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				resController.AddToWatch(coreApplicationGVR)
 				resController.AddToWatch(coreDeploymentGVR)
 				resController.AddToWatch(coreStatefulSetGVR)
+				resController.AddToWatch(coreDeploymentConfigGVR)
 				//resController.AddToWatch(KAppNav)
 				err = deleteOrphanedAutoCreatedApplications(resController)
 				if err != nil {
 					klog.Errorf("Error deleting orphaned applications: %s", err)
 				}
+			} else if (gvr == coreWasTraditionalAppGVR) ||
+				(gvr == coreWasNDCellGVR) ||
+				(gvr == coreLibertyAppGVR) ||
+				(gvr == coreLibertyCollectiveGVR) {
+				if resController.isAllNamespacesPermitted() {
+					// always generate status for WAS related kinds
+					resController.nsFilter.permitAllNamespacesForGVR(gvr)
+				} else {
+					// only get status for WAS kinds in namespaces allowed in this kappnav instance
+					for _, ns := range resController.namespaces {
+						resController.nsFilter.permitNamespace(resController, gvr, ns)
+					}
+				}
+				resController.AddToWatch(gvr)
 			}
 		}
 	}

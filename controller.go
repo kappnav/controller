@@ -152,6 +152,11 @@ var (
 		Version:  "v1",
 		Resource: "deployments",
 	}
+	coreDeploymentConfigGVR = schema.GroupVersionResource{
+		Group:    "apps.openshift.io",
+		Version:  "v1",
+		Resource: "deploymentconfigs",
+	}
 	coreConfigMapGVR = schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -253,6 +258,7 @@ func init() {
 	coreKindToGVR = make(map[string]schema.GroupVersionResource)
 	coreKindToGVR["Service"] = coreServiceGVR
 	coreKindToGVR["Deployment"] = coreDeploymentGVR
+	coreKindToGVR["DeploymentConfig"] = coreDeploymentConfigGVR
 	coreKindToGVR["Route"] = coreRouteGVR
 	coreKindToGVR["ConfigMap"] = coreConfigMapGVR
 	coreKindToGVR["Secret"] = coreSecretGVR
