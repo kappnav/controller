@@ -1,5 +1,5 @@
 /*
-Copyright 2019 IBM Corporation
+Copyright 2020 IBM Corporation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				resController.AddToWatch(coreApplicationGVR)
 				resController.AddToWatch(coreDeploymentGVR)
 				resController.AddToWatch(coreStatefulSetGVR)
+				resController.AddToWatch(coreDeploymentConfigGVR)
 				//resController.AddToWatch(KAppNav)
 				err = deleteOrphanedAutoCreatedApplications(resController)
 				if err != nil {
