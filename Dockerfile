@@ -64,6 +64,10 @@ RUN microdnf -y install shadow-utils \
     && chown 1001:0 /app \
     && chmod g+rwx /app
 
+RUN microdnf install -y yum \
+    && yum update -y \
+    && microdnf remove yum
+
 COPY --from=builder --chown=1001:0 /go/src/github.com/kappnav/controller/controller /app
 COPY --chown=1001:0 licenses/ /licenses/
 COPY --chown=1001:0 testcntlr.sh /bin/testcntlr.sh
