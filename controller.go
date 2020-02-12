@@ -152,11 +152,6 @@ var (
 		Version:  "v1",
 		Resource: "deployments",
 	}
-	coreDeploymentConfigGVR = schema.GroupVersionResource{
-		Group:    "apps.openshift.io",
-		Version:  "v1",
-		Resource: "deploymentconfigs",
-	}
 	coreConfigMapGVR = schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -258,7 +253,6 @@ func init() {
 	coreKindToGVR = make(map[string]schema.GroupVersionResource)
 	coreKindToGVR["Service"] = coreServiceGVR
 	coreKindToGVR["Deployment"] = coreDeploymentGVR
-	coreKindToGVR["DeploymentConfig"] = coreDeploymentConfigGVR
 	coreKindToGVR["Route"] = coreRouteGVR
 	coreKindToGVR["ConfigMap"] = coreConfigMapGVR
 	coreKindToGVR["Secret"] = coreSecretGVR
@@ -420,7 +414,7 @@ func fetchDataFromConfigMap(dynInterf dynamic.Interface) ([]string, string, map[
 		if !ok {
 			return nil, "", nil, fmt.Errorf("Configmap kappnav-config app-namespaces is not a string")
 		}
-		namespaces = stringToNamespaceMap(appNamespacesStr)
+		namespaces = stringToNamespaceSet(appNamespacesStr)
 	}
 	return ret, unknownStat, namespaces, nil
 }
@@ -635,41 +629,38 @@ func (resController *ClusterWatcher) getWatchGVR(gvr schema.GroupVersionResource
 	return schema.GroupVersionResource{}, false
 }
 
-// getGVRForGroupKind gets the GVR for a kind and group
-func (resController *ClusterWatcher) getGVRForGroupKind(inGroup string, kind string) (schema.GroupVersionResource, bool) {
-
+func (resController *ClusterWatcher) getGVRsForGroupKind(group string, kind string) (map[schema.GroupVersionResource]schema.GroupVersionResource, string, bool) {
 	// map group/kind to apiVersion
-	var group string
-	if inGroup == "core" {
-		group = ""
-	}
+
 	groupKind := group + "/" + kind
 	if klog.V(2) {
-		klog.Infof("getGVRForGroupKind trying group/Kind: %s", groupKind)
+		klog.Infof("getGVRsForGroupKind trying group/Kind: %s", groupKind)
 	}
-	gvr, ok := resController.groupKindToGVR.Load(groupKind)
+	gvrs, ok := resController.groupKindToGVR.Load(groupKind)
 	if ok {
 		if klog.V(2) {
-			klog.Infof("getGVRForGroupKind for group: %s kind: %s returning: %v", inGroup, kind, gvr.(schema.GroupVersionResource))
+			klog.Infof("getGVRsForGroupKind for group: %s kind: %s returning GVRs: %v", group, kind, gvrs.(map[schema.GroupVersionResource]schema.GroupVersionResource))
 		}
-		return gvr.(schema.GroupVersionResource), true
+		return gvrs.(map[schema.GroupVersionResource]schema.GroupVersionResource), group, true
 	}
 	if klog.V(2) {
-		klog.Infof("getGVRForGroupKind WARNING: No CRD found with group: " + group + " for kind: " + kind)
+		klog.Infof("getGVRsForGroupKind WARNING: No CRD found with group: " + group + " for kind: " + kind)
 	}
 	// no CRDs installed with the specified group/kind
 	// See if it's one of the core kinds for compatibility
-	gvr, ok = coreKindToGVR[kind]
+	gvr, ok := coreKindToGVR[kind]
 	if ok {
 		if klog.V(2) {
-			klog.Infof("getGVRForGroupKind returning default GVR for group: %s kind: %s GVR: %v", inGroup, kind, gvr.(schema.GroupVersionResource))
+			klog.Infof("getGVRsForGroupKind returning default GVR for group: %s kind: %s GVRs: %v", group, kind, gvr)
 		}
-		return gvr.(schema.GroupVersionResource), true
+		gvrSet := make(map[schema.GroupVersionResource]schema.GroupVersionResource, 1)
+		gvrSet[gvr] = gvr
+		return gvrSet, gvr.Group, true
 	}
 	if klog.V(2) {
-		klog.Infof("getGVRForGroupKind no CRD found for group: %s kind: %s, returning false", inGroup, kind)
+		klog.Infof("getGVRsForGroupKind returning false - no CRD found for group: %s kind: %s", group, kind)
 	}
-	return schema.GroupVersionResource{}, false
+	return nil, "", false
 }
 
 // get resource watcher
@@ -743,27 +734,15 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 	if group != "" {
 		apiVersionKind = group + "/" + apiVersionKind
 		groupKind := group + "/" + kind
-		// don't replace an existing entry for a core GVR
-		store := true
-		gvr, ok := resController.groupKindToGVR.Load(groupKind)
-		if ok {
-			coreGVR, ok := coreKindToGVR[kind]
-			if ok && coreGVR == gvr {
-				if klog.V(2) {
-					klog.Infof("addResourceMapEntry not repacing group/Kind map core GVR: %s with GVR: %s", coreGVR, gvr)
-				}
-				store = false
-			}
+		gvrSet, ok := resController.groupKindToGVR.Load(groupKind)
+		if !ok {
+			gvrSet = make(map[schema.GroupVersionResource]schema.GroupVersionResource, 10)
 		}
-		if store == true {
-			if klog.V(2) {
-				klog.Infof("addResourceMapEntry mapping group/Kind: %s to GVR: %s", groupKind, gvr)
-			}
-			resController.groupKindToGVR.Store(groupKind, gvr)
-		}
+		gvrSet.(map[schema.GroupVersionResource]schema.GroupVersionResource)[gvr] = gvr
+		resController.groupKindToGVR.Store(groupKind, gvrSet)
 	}
 	if klog.V(2) {
-		klog.Infof("addResourceMapEntry mapping apiVersion/Kind: %s to GVR: %s", apiVersionKind, gvr)
+		klog.Infof("addResourceMapEntry mapping apiVersion/Kind: %s to GVR: %v", apiVersionKind, gvr)
 	}
 	resController.apiVersionKindToGVR.Store(apiVersionKind, gvr)
 	rw.Group = group
@@ -880,19 +859,18 @@ func (resController *ClusterWatcher) initResourceMap() error {
 	var groups = apiGroups.Groups
 	var group metav1.APIGroup
 	for _, group = range groups {
-		// Special case for kube 1.16 / OCP 4.3 which added apiextensions.k8s.io/v1
-		// so can't use only the preferred version.
-		// TODO: Probably should handle all versions of all resources, more test needed first
-		if group.Name == "apiextensions.k8s.io" {
+		// kube 1.16 / OCP 4.3 added apiextensions.k8s.io/v1	
+		// so can no longer use only the preferred version.	
+		if group.Name == "apiextensions.k8s.io" {	
 			for i := 0; i < len(group.Versions); i++ {
 				if klog.V(2) {
 					klog.Infof("initResourceMap processing apiextensions.k8s.io GroupVersion %s", group.Versions[i].GroupVersion)
 				}
 				resController.processResourceGroup(group.Versions[i].GroupVersion, discClient)
 			}
-		} else {
-			resController.processResourceGroup(group.PreferredVersion.GroupVersion, discClient)
-		}
+		} else {	
+			resController.processResourceGroup(group.PreferredVersion.GroupVersion, discClient)	
+		}	
 	}
 	if klog.V(2) {
 		klog.Infof("initResourceMap exit")
@@ -1142,9 +1120,9 @@ func (resInfo *resourceInfo) key() string {
 }
 
 type groupKind struct {
-	group string
-	kind  string
-	gvr   schema.GroupVersionResource
+	group  string
+	kind   string
+	gvrSet map[schema.GroupVersionResource]schema.GroupVersionResource
 }
 
 const (
@@ -1292,7 +1270,7 @@ func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructu
 		componentNS, _ = tmp.(string)
 	}
 	// Get namespaces this Application is limited to
-	var componentNamespaces = stringToNamespaceMap(componentNS)
+	var componentNamespaces = stringToNamespaceSet(componentNS)
 	appResource.componentNamespaces = make(map[string]string)
 	for _, ns := range componentNamespaces {
 		if resController.isNamespacePermitted(ns) {
@@ -1327,18 +1305,15 @@ func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructu
 				if klog.V(4) {
 					klog.Infof("parseAppResource application: %s processing componentKind: group: %s  kind: %s", appResource.name, group, kind)
 				}
-				gvr, ok3 := resController.getGVRForGroupKind(group, kind)
+				gvrs, group1, ok3 := resController.getGVRsForGroupKind(group, kind)
 				if ok3 {
-					if group == "" {
-						group = "/" + gvr.Version
-						if klog.V(4) {
-							klog.Infof("parseAppResource application: %s setting group to /gvr.Version: %s", appResource.name, group)
-						}
+					if group1 != group && klog.V(2) {
+						klog.Infof("parseAppResource substituting componentKind group %s for %s", group1, group)
 					}
 					var groupKind = groupKind{
-						group: group,
-						kind:  kind,
-						gvr:   gvr,
+						group:  group1,
+						kind:   kind,
+						gvrSet: gvrs,
 					}
 					if klog.V(4) {
 						klog.Infof("parseAppResource application: %s groupKind: %v", appResource.name, groupKind)
@@ -1346,7 +1321,7 @@ func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructu
 					appResource.componentKinds = append(appResource.componentKinds, groupKind)
 				} else {
 					if klog.V(4) {
-						klog.Infof("parseAppResource application: %s error getting GVR for componentKind: group: %s kind: %s", appResource.name, group, kind)
+						klog.Infof("parseAppResource skipping componentKind for application: %s error getting GVR for componentKind: group: %s kind: %s", appResource.name, group, kind)
 					}
 				}
 			}

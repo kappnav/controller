@@ -91,14 +91,43 @@ func labelsMatch(matchLabels map[string]string, labels map[string]string) bool {
 	return true
 }
 
-// Return true if input kind is contained in array of groupKind
-func isContainedIn(arr []groupKind, kind string) bool {
+// Return true if input group and kind are contained in array of groupKind
+func isContainedIn(arr []groupKind, resInfo *resourceInfo) bool {
+	if klog.V(2) {
+		klog.Infof("isContainedIn entry resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+	}
+	group := getGroupFromAPIVersion(resInfo.apiVersion)
 	for _, gk := range arr {
-		if strings.Compare(gk.kind, kind) == 0 {
+		if klog.V(2) {
+			klog.Infof("isContainedIn gk.kind: %s gk.group %s\n", gk.kind, gk.group)
+		}
+		if strings.Compare(gk.kind, resInfo.kind) == 0 &&
+			strings.Compare(gk.group, group) == 0 {
+			if klog.V(2) {
+				klog.Infof("isContainedIn exit true resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+			}
 			return true
 		}
 	}
+	if klog.V(2) {
+		klog.Infof("isContainedIn exit false resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+	}
 	return false
+}
+
+func getGroupFromAPIVersion(apiVersion string) string {
+	if klog.V(2) {
+		klog.Infof("getGroupFromAPIVersion entry apiVersion: %s\n", apiVersion)
+	}
+	var group string
+	if strings.Contains(apiVersion, "/") {
+		split := strings.Split(apiVersion, "/")
+		group = split[0]
+	}
+	if klog.V(2) {
+		klog.Infof("getGroupFromAPIVersion apiVersion: %s group: %s\n", apiVersion, group)
+	}
+	return group
 }
 
 // return true if the input string is contaied in array of strings
@@ -192,15 +221,15 @@ func resourceNamespaceMatchesApplicationComponentNamespaces(resController *Clust
 	return ok
 }
 
-// Return true if this resource is a component of the application
-func resourceComponentOfApplication(resController *ClusterWatcher, appResInfo *appResourceInfo, resInfo *resourceInfo) bool {
+// Return true if the resource is a component of the application
+func isComponentOfApplication(resController *ClusterWatcher, appResInfo *appResourceInfo, resInfo *resourceInfo) bool {
 	if klog.V(4) {
-		klog.Infof("resourceComponentOfApplication app: %s, resource: %s\n", appResInfo.name, resInfo.name)
+		klog.Infof("isComponentOfApplication app: %s, resource: %s\n", appResInfo.name, resInfo.name)
 	}
 
 	if !resourceNamespaceMatchesApplicationComponentNamespaces(resController, appResInfo, resInfo.namespace) {
 		if klog.V(4) {
-			klog.Infof("    resourceComponentOfApplication false due to namespace: resource is %s/%s, application is %s/%s, component namespaces is: %s", resInfo.namespace, resInfo.name, appResInfo.namespace, appResInfo.name, appResInfo.componentNamespaces)
+			klog.Infof("    isComponentOfApplication false due to namespace: resource is %s/%s, application is %s/%s, component namespaces is: %s", resInfo.namespace, resInfo.name, appResInfo.namespace, appResInfo.name, appResInfo.componentNamespaces)
 		}
 		return false
 	}
@@ -208,14 +237,14 @@ func resourceComponentOfApplication(resController *ClusterWatcher, appResInfo *a
 	if isSameResource(&appResInfo.resourceInfo, resInfo) {
 		// self
 		if klog.V(4) {
-			klog.Infof("    resourceComponentOfApplication false: resource is self\n")
+			klog.Infof("    isComponentOfApplication false: resource is self\n")
 		}
 		return false
 	}
-	if !isContainedIn(appResInfo.componentKinds, resInfo.kind) {
+	if !isContainedIn(appResInfo.componentKinds, resInfo) {
 		// resource kind not what the application wants to include
 		if klog.V(4) {
-			klog.Infof("    resourceComponentOfApplication false: component kinds: %v, resource kind: %s\n", appResInfo.componentKinds, resInfo.kind)
+			klog.Infof("    isComponentOfApplication false: component kinds: %v, resource apiVersion: %s kind: %s \n", appResInfo.componentKinds, resInfo.apiVersion, resInfo.kind)
 		}
 		return false
 	}
@@ -240,7 +269,7 @@ func resourceComponentOfApplication(resController *ClusterWatcher, appResInfo *a
 		ret = false
 	}
 	if klog.V(4) {
-		klog.Infof("    resourceComponentOfApplication %t\n", ret)
+		klog.Infof("    isComponentOfApplication %t\n", ret)
 	}
 	return ret
 }
@@ -322,7 +351,7 @@ func getApplicationsForResource(resController *ClusterWatcher, resInfo *resource
 			if klog.V(4) {
 				klog.Infof("    checking application: %s\n", appResInfo.name)
 			}
-			if resourceComponentOfApplication(resController, appResInfo, resInfo) {
+			if isComponentOfApplication(resController, appResInfo, resInfo) {
 				if klog.V(4) {
 					klog.Infof("    found application: %s\n", appResInfo.name)
 				}
@@ -436,19 +465,21 @@ func startWatchApplicationComponentKinds(resController *ClusterWatcher, obj inte
 			var componentKinds = appInfo.componentKinds
 			nsFilter := resController.nsFilter
 			for _, elem := range componentKinds {
-				// TODO: PWB process group here, map to gvr
-				/* Start processing kinds in the application's namespace */
-				nsFilter.permitNamespace(resController, elem.gvr, appInfo.resourceInfo.namespace)
+				// watch every installed version of the group
+				for _, gvr := range elem.gvrSet {
+					/* Start processing kinds in the application's namespace */
+					nsFilter.permitNamespace(resController, gvr, appInfo.resourceInfo.namespace)
 
-				/* also permit namespaces in the kappnav.component.namespaces annotation */
-				for _, ns := range appInfo.componentNamespaces {
-					nsFilter.permitNamespace(resController, elem.gvr, ns)
-				}
+					/* also permit namespaces in the kappnav.component.namespaces annotation */
+					for _, ns := range appInfo.componentNamespaces {
+						nsFilter.permitNamespace(resController, gvr, ns)
+					}
 
-				err := resController.AddToWatch(elem.gvr)
-				if err != nil {
-					// TODO: should we continue to process the rest of kinds?
-					return err
+					err := resController.AddToWatch(gvr)
+					if err != nil {
+						// TODO: should we continue to process the rest of kinds?
+						return err
+					}
 				}
 			}
 			applications[appInfo.resourceInfo.key()] = &appInfo.resourceInfo

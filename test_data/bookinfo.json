@@ -16,11 +16,11 @@
     "spec": {
         "componentKinds": [
             {
-                "group": "apps",
+                "group": "app.k8s.io",
                 "kind": "Application"
             },
             {
-                "group": "apps",
+                "group": "extensions",
                 "kind": "NetworkPolicy"
             },
             {
@@ -28,7 +28,7 @@
                 "kind": "CloudService"
             },
             {
-                "group": "apps",
+                "group": "extensions",
                 "kind": "Ingress"
             }
         ],
