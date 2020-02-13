@@ -2,7 +2,7 @@
 
 # controller
 
-The controller component is the Kubernetes controller for Application Naviagator Custom Resource Definition. 
+The controller component is the Kubernetes controller for Application Navigator Custom Resource Definition. 
 
 ## build
 
