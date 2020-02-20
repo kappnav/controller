@@ -225,49 +225,52 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 	// loop over all components kinds
 	for _, component := range componentKinds {
 		// loop over all resources of each component kind
-		gvr, ok := resController.getGVRForGroupKind(component.group, component.kind)
-		var resources = resController.listResources(gvr)
-		for _, res := range resources {
+		gvrs, _, ok := resController.getGVRsForGroupKind(component.group, component.kind)
+		// handle every installed version of the group
+		for _, gvr := range gvrs {
+			var resources = resController.listResources(gvr)
+			for _, res := range resources {
 
-			var unstructuredObj = res.(*unstructured.Unstructured)
+				var unstructuredObj = res.(*unstructured.Unstructured)
 
-			var resInfo = &resourceInfo{}
-			resController.parseResource(unstructuredObj, resInfo)
-			if resourceComponentOfApplication(resController, appInfo, resInfo) {
-				// not self and labels match selector
-				if klog.V(4) {
-					klog.Infof("    found component: %s\n", resInfo.name)
-				}
-
-				var stat string
-				var err error
-				if resInfo.kind == APPLICATION {
-					// recursively calculate application status
-					var tmpAppInfo = &appResourceInfo{}
-					err = resController.parseAppResource(unstructuredObj, tmpAppInfo)
-					if err != nil {
-						return false, "", err
+				var resInfo = &resourceInfo{}
+				resController.parseResource(unstructuredObj, resInfo)
+				if isComponentOfApplication(resController, appInfo, resInfo) {
+					// not self and labels match selector
+					if klog.V(4) {
+						klog.Infof("    found component: %s\n", resInfo.name)
 					}
-					ok, stat, err = processOneApplication(resController, &tmpAppInfo.resourceInfo, visited, hasStatus, toFetch, toChange)
-					if err != nil {
-						return false, "", err
-					}
-					if !ok {
-						// skip this one to avoid infinite recursion
-						if klog.V(4) {
-							klog.Infof("    skipping application: %s\n", resInfo.name)
+
+					var stat string
+					var err error
+					if resInfo.kind == APPLICATION {
+						// recursively calculate application status
+						var tmpAppInfo = &appResourceInfo{}
+						err = resController.parseAppResource(unstructuredObj, tmpAppInfo)
+						if err != nil {
+							return false, "", err
 						}
-						continue
-					}
-				} else {
-					// calculate resource status
-					stat, err = processOneResource(resController, resInfo, hasStatus, toFetch, toChange)
-					if err != nil {
-						return false, stat, err
-					}
+						ok, stat, err = processOneApplication(resController, &tmpAppInfo.resourceInfo, visited, hasStatus, toFetch, toChange)
+						if err != nil {
+							return false, "", err
+						}
+						if !ok {
+							// skip this one to avoid infinite recursion
+							if klog.V(4) {
+								klog.Infof("    skipping application: %s\n", resInfo.name)
+							}
+							continue
+						}
+					} else {
+						// calculate resource status
+						stat, err = processOneResource(resController, resInfo, hasStatus, toFetch, toChange)
+						if err != nil {
+							return false, stat, err
+						}
 
+					}
+					checker.addStatus(stat)
 				}
-				checker.addStatus(stat)
 			}
 		}
 	}

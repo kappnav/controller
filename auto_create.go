@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,15 +56,17 @@ const (
 
 	defaultAutoCreateAppVersion = "1.0.0"
 	defaultAutoCreateAppLabel   = "app"
+
+	namespaceRegex = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 )
 
 /* default kinds for auto-created app*/
 var defaultKinds = []groupKind{
 	groupKind{group: "apps", kind: "Deployment"},
 	groupKind{group: "apps", kind: "StatefulSet"},
-	groupKind{group: "core", kind: "Service"},
+	groupKind{group: "", kind: "Service"},
 	groupKind{group: "extensions", kind: "Ingress"},
-	groupKind{group: "core", kind: "ConfigMap"}}
+	groupKind{group: "", kind: "ConfigMap"}}
 
 /* information about resource from which to auto-create applications */
 type autoCreateResourceInfo struct {
@@ -85,8 +88,7 @@ func stringToArrayOfString(inStr string) []string {
 	tmpArray := strings.Split(inStr, ",")
 	var finalArray = make([]string, 0)
 	for _, str := range tmpArray {
-		str = strings.TrimLeft(str, " ")
-		str = strings.TrimRight(str, " ")
+		str = strings.Trim(str, " ")
 		if len(str) != 0 {
 			finalArray = append(finalArray, str)
 		}
@@ -144,21 +146,21 @@ func stringToArrayOfAlphaNumeric(inStr string) []string {
 	return ret
 }
 
-/* Convert a comma separate string into map of alphanumeric
-First, the string is split by ","
-Then all trailing and ending non-alpha numeric are removed
-Any string that is not all alpha-numeric is discarded.
-An map is constructed of remaining strings, where the key/value are the same
-*/
-func stringToNamespaceMap(inStr string) map[string]string {
-	tmpArray := stringToArrayOfString(inStr)
+// stringToNamespaceSet converts a comma separated string into a
+// set of strings. Only valid kube namespace names will be added
+// to the set.
+// (the "set" is a map of strings to themselves as go has not set datatype.)
+func stringToNamespaceSet(inStr string) map[string]string {
+	strings := stringToArrayOfString(inStr)
 	ret := make(map[string]string)
-	for _, val := range tmpArray {
-		if newval, ok := trimNonAlphaNumeric(val); ok {
-			// Note: Should we issue some msg here if a namespace
-			// contains invalid chars? Do we really want to just
-			// use the trimmed name?
-			ret[newval] = newval
+	for _, val := range strings {
+		isValidName, _ := regexp.MatchString(namespaceRegex, val)
+		if isValidName {
+			ret[val] = val
+		} else {
+			if klog.V(2) {
+				klog.Infof("stringToNamespaceSet %s is not a valid namespace name", val)
+			}
 		}
 	}
 	return ret
@@ -244,30 +246,19 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 							klog.Infof("parseAutoCreateResourceInfo using group: %s kind: %s from kappnav.app.auto-create.kinds entry: %s", group, kind, val)
 						}
 						gvr, ok = resController.getWatchGVRForKind(kind)
-						if !ok {
-							gvr, ok = resController.getWatchGVRForKind(kind)
-						}
 					} else {
-						// no /, kappnav.app.auto-create.kinds anno entry is just a kind
+						// no / so kappnav.app.auto-create.kinds anno entry is just a kind
 						kind = val
 						gvr, ok = resController.getWatchGVRForKind(kind)
 						if ok {
-							if gvr.Group == "" {
-								group = "core"
-							} else {
-								group = gvr.Group
-							}
+							group = gvr.Group
 							if klog.V(4) {
 								klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, kind)
 							}
 						} else {
 							gvr, ok = coreKindToGVR[val]
 							if ok {
-								if gvr.Group == "" {
-									group = "core"
-								} else {
-									group = gvr.Group
-								}
+								group = gvr.Group
 								if klog.V(4) {
 									klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
 								}
@@ -280,7 +271,7 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 						}
 					}
 					if (gvr != schema.GroupVersionResource{}) {
-						resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, gvr})
+						resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, nil})
 					} else {
 						if klog.V(4) {
 							klog.Infof("parseAutoCreateResourceInfo no GVR found for kappnav.app.auto-create.kinds entry: %s, skipping", val)
