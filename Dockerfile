@@ -45,11 +45,13 @@ FROM registry.access.redhat.com/ubi7-minimal
 
 ARG VERSION
 ARG BUILD_DATE
+ARG COMMIT
 
 LABEL name="Application Navigator" \
       version=$VERSION \
       release=$VERSION \
       created=$BUILD_DATE \
+      commit=$COMMIT \
       vendor="kAppNav" \
       summary="Controller image for Application Navigator" \
       description="This image contains the Controller for Application Navigator"
