@@ -17,15 +17,16 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
-	"k8s.io/klog"
 )
 
 const (
@@ -101,6 +102,7 @@ const (
 	ns4Deployment            = "test_data/ns4_deployment.json"
 	nonsApp                  = "test_data/NoNS-App.json"  // app that includes resource w/o namespace
 	nonsNode                 = "test_data/NoNS-Node.json" // node resource, which has no namespace
+	kappnavCRFile            = "test_data/kappnav-CR.json"
 )
 
 /**
@@ -121,17 +123,29 @@ var coreFooGVR = schema.GroupVersionResource{
 	Resource: "foos",
 }
 
+var loglevel string
+
 func init() {
-	if klog.V(2) {
-		klog.Infof("Initializing kind to GVR map mocks")
+	logger = NewLogger(false)  //create a new logger and set enableJSONLog false (log in plain text) 
+	
+	// set to none to avoid build exceeding log size
+	logger.SetLogLevel(LogLevelNone)
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, "Initializing kind to GVR map mocks")
 	}
+
+	// new flag to set the unit test log level
+	flag.StringVar(&loglevel, "loglevel", "", "The log level setting for unit test")
 
 	coreKindToGVR["NetworkPolicy"] = coreNetworkPolicyGVR
 	coreKindToGVR["Foo"] = coreFooGVR
+	coreKindToGVR["kappnav"] = coreKappNavGVR
 }
+
 func initControllerMaps(resController *ClusterWatcher) {
-	if klog.V(2) {
-		klog.Info("initControllerMaps")
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, "initControllerMaps")
 	}
 
 	resController.apiVersionKindToGVR.Store("v1/Service", coreServiceGVR)
@@ -155,11 +169,27 @@ func initControllerMaps(resController *ClusterWatcher) {
 	resController.apiVersionKindToGVR.Store("rbac.authorization.k8s.io/v1/RoleBinding", coreRoleBindingGVR)
 	resController.apiVersionKindToGVR.Store("storage.k8s.io/v1/StorageClass", coreStorageClassGVR)
 	resController.apiVersionKindToGVR.Store("v1/Endpoint", coreEndpointGVR)
-	resController.apiVersionKindToGVR.Store("samplecontroller.k8s.io/v1alpha1/Foo", coreFooGVR)
 	resController.apiVersionKindToGVR.Store("v1/Node", coreNodeGVR)
+	resController.apiVersionKindToGVR.Store("v1/Kappnav", coreKappNavGVR)
 }
 
 func beforeTest() {
+	setTestLogLevel(loglevel)
+}
+
+func setTestLogLevel(loglevel string) {
+	loglevels := []string{"none", "warning", "error", "info", "debug", "entry", "all"}
+	if len(loglevel) > 0 {
+		str := strings.ToLower(loglevel)
+		_, found := Find(loglevels, str)
+		if found {
+			//set logging level
+			fmt.Println("The unit test log level is set to:", loglevel)
+			SetLoggingLevel(str)
+		} else {
+			fmt.Println("The specified loglevel value is not valid. Valid values are: none, warning, error, info, debug, entry, all")
+		}
+	}
 }
 
 // returns function to get component status, scoped by the testActions
@@ -177,8 +207,8 @@ func newComponentStatusFunc(ta *testActions, failRate float32) calculateComponen
 // Create a new ClusterWatcher for unit test environment
 // pre-populating it with resources
 func createClusterWatcher(resources []resourceID, testActions *testActions, failureRate float32) (*ClusterWatcher, error) {
-	if klog.V(3) {
-		klog.Info("createClusterWatcher entry")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "")
 	}
 
 	scheme := runtime.NewScheme()
@@ -187,8 +217,8 @@ func createClusterWatcher(resources []resourceID, testActions *testActions, fail
 	fakeDiscovery := newFakeDiscovery()
 	err := populateResources(resources, dynClient, fakeDiscovery)
 	if err != nil {
-		if klog.V(2) {
-			klog.Info("createClusterWatcher exit exiting, error: #v", err)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Exiting, error: %v", err))
 		}
 		return nil, err
 	}
@@ -197,23 +227,25 @@ func createClusterWatcher(resources []resourceID, testActions *testActions, fail
 		dynClient, fakeDiscovery, BatchDuration, newComponentStatusFunc(testActions, failureRate)}
 	resController, err := NewClusterWatcher(plugin)
 	if err != nil {
-		if klog.V(3) {
-			klog.Infof("createClusterWatcher Error calling NewClusterWatcher: %s", err)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Error calling NewClusterWatcher: %s", err))
 		}
 		return resController, err
 	}
 	initControllerMaps(resController)
 
 	testActions.setClusterWatcher(resController)
-	if klog.V(3) {
-		klog.Info("createClusterWatcher exit success")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "success")
 	}
+
 	return resController, nil
 }
 
 // Test we can populate the cache with a bunch of resources
 func TestPopulateResources(t *testing.T) {
 	testName := "TestPopulateResources"
+
 	beforeTest()
 	// kinds to check for status
 	var kindsToCheckStatus = map[string]bool{}
@@ -242,6 +274,7 @@ func TestPopulateResources(t *testing.T) {
 		crdFoo,
 		fooExample,
 		appFoo,
+		kappnavCRFile,
 	}
 
 	iteration0IDs, err := readResourceIDs(files)
@@ -299,6 +332,7 @@ func oneAppHelper(t *testing.T, testName string, positiveTest bool) error {
 		deploymentProcuctpageV1,
 		serviceProductpage,
 		KappnavConfigFile,
+		kappnavCRFile,
 	}
 	iteration0IDs, err := readResourceIDs(files)
 	if err != nil {
@@ -359,13 +393,15 @@ func oneAppHelper(t *testing.T, testName string, positiveTest bool) error {
 		return nil
 	}
 	if err == nil {
-		return fmt.Errorf("oneAppHelper: negative test, but actions passed")
+		return fmt.Errorf("negative test, but actions passed")
 	}
 	return nil
 }
 
 func TestOneApp(t *testing.T) {
-	if err := oneAppHelper(t, "TestOneApp", true); err != nil {
+	testName := "TestOneApp"
+	beforeTest()
+	if err := oneAppHelper(t, testName, true); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -466,6 +502,7 @@ func TestAddResource(t *testing.T) {
 		"Deployment":    true,
 		"StatefulSet":   true,
 		"NetworkPolicy": true,
+		//		"Kappnav":       true,
 	}
 
 	// resources to pre-populate
@@ -486,6 +523,7 @@ func TestAddResource(t *testing.T) {
 		/* 13 */ networkpolicyProductpage,
 		/* 14 */ ingressBookinfo,
 		/* 15 */ networkpolicyReviews,
+		//		/* 16 */ kappnavCRFile,
 	}
 
 	iteration0IDs, err := readResourceIDs(files)

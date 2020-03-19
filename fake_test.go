@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restClient "k8s.io/client-go/rest"
-	"k8s.io/klog"
 )
 
 func readFile(fileName string) ([]byte, error) {
@@ -75,8 +74,8 @@ func readOneResourceID(fileName string) (resourceID, error) {
 	resource.kind = resInfo.kind
 	gvr, ok := coreKindToGVR[resInfo.kind]
 	if !ok {
-		if klog.V(2) {
-			klog.Infof("readOneResourceID no GVR found for kind: %s", resInfo.kind)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("No GVR found for kind: %s", resInfo.kind))
 		}
 	}
 	resource.gvr = gvr
@@ -127,14 +126,15 @@ func testPluralToKind(t *testing.T) {
 
 // Populate resources into fake dynamic client, and populate fake discovery
 func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interface, fakeDisc *fakeDiscovery) error {
-	if klog.V(3) {
-		klog.Info("populateResources entry")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "")
 	}
 
 	for _, toCreate := range toCreateResources {
-		if klog.V(3) {
-			klog.Infof("populateResources reading %s", toCreate.fileName)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("reading %s", toCreate.fileName))
 		}
+
 		obj, err := readJSON(toCreate.fileName)
 		if err != nil {
 			return err
@@ -144,8 +144,8 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 
 		// Add data for discovery
 		if err = fakeDisc.addKind(gvk.Kind, gvk.Group, gvk.Version, gvk.Kind, resource); err != nil {
-			if klog.V(3) {
-				klog.Infof("populateResources unable to add kind %s", gvk.Kind)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Unable to add kind %s", gvk.Kind))
 			}
 			return err
 		}
@@ -160,17 +160,17 @@ func populateResources(toCreateResources []resourceID, dynInterf dynamic.Interfa
 		_, err = interf.Create(obj, metav1.CreateOptions{})
 
 		if err != nil {
-			if klog.V(3) {
-				klog.Infof("populateResources exit err %s", err)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Error %s", err))
 			}
 			return err
 		}
-		if klog.V(3) {
-			klog.Infof("populateResources success reading %s", toCreate.fileName)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Success reading %s", toCreate.fileName))
 		}
 	}
-	if klog.V(3) {
-		klog.Info("populateResources exit success")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "success")
 	}
 	return nil
 }
@@ -330,13 +330,13 @@ func isNamespaced(kind string) bool {
 }
 
 func (fd *fakeDiscovery) addKind(kind, group, version, name, plural string) error {
-	if klog.V(3) {
-		klog.Infof("addKind kind: %s, group: %s, name: %s, version: %s, plural:%s", kind, group, version, name, plural)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("kind: %s, group: %s, name: %s, version: %s, plural:%s", kind, group, version, name, plural))
 	}
 	fakeGroup, err := fd.addAPIGroup(group, version)
 	if err != nil {
-		if klog.V(3) {
-			klog.Infof("addKind failed %s", err)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("failed %s", err))
 		}
 		return err
 	}

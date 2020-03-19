@@ -23,14 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
 )
 
 // Send resource status change back to Kubernetes server
 func sendResourceStatus(resController *ClusterWatcher, resInfo *resourceInfo, status string, flyoverText string, flyOverNLS string) error {
-	if klog.V(4) {
-		klog.Infof("sendResourceStatus %s set to %s\n", resInfo.name, status)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s set to %s\n", resInfo.name, status))
 	}
+
 	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
 		var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
@@ -53,14 +53,14 @@ func sendResourceStatus(resController *ClusterWatcher, resInfo *resourceInfo, st
 		resController.parseResource(unstructuredObj, resInfo)
 		if strings.Compare(resInfo.kappnavStatVal, status) != 0 {
 			// change status
-			if klog.V(2) {
-				klog.Infof("Setting kappnav status on Kubernetes server: resource: %s %s %s,  status: %s, flyover: %s\n", resInfo.kind, resInfo.namespace, resInfo.name, status, flyoverText)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Setting kappnav status on Kubernetes server: resource: %s %s %s,  status: %s, flyover: %s\n", resInfo.kind, resInfo.namespace, resInfo.name, status, flyoverText))
 			}
 			setkAppNavStatus(unstructuredObj, status, flyoverText, flyOverNLS)
 			_, err = intf.Update(unstructuredObj, metav1.UpdateOptions{})
 			if err != nil {
-				if klog.V(2) {
-					klog.Errorf("    error setting kappnav status %s\n", err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("    error setting kappnav status %s\n", err))
 				}
 			}
 			return err
@@ -132,8 +132,8 @@ func processBatchOfApplicationsAndResources(ts *batchStore, resources *batchReso
 	for appName := range resources.applications {
 		apps = append(apps, appName)
 	}
-	if klog.V(4) {
-		klog.Infof("    processBatchOfApplicationAndResources applications: total: %d, application names: %s\n", len(resources.applications), apps)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("applications: total: %d, application names: %s\n", len(resources.applications), apps))
 	}
 
 	hasStatus := make(map[string]*resourceInfo)
@@ -192,15 +192,15 @@ Process status for one application
    processErr : any error captured
 */
 func processOneApplication(resController *ClusterWatcher, res *resourceInfo, visited map[string]*resourceInfo, hasStatus map[string]*resourceInfo, toFetch map[string]*resourceInfo, toChange map[string]*resourceInfo) (statusOK bool, status string, processErr error) {
-	if klog.V(4) {
-		klog.Infof("processOneApplication for %s\n", res.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("for %s\n", res.name))
 	}
 
 	key := res.key()
 	_, ok := visited[key]
 	if ok {
-		if klog.V(4) {
-			klog.Infof("    application %s already visited\n", res.name)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    application %s already visited\n", res.name))
 		}
 		// already visited
 		return false, "", nil
@@ -210,8 +210,8 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 	computed, exists := hasStatus[key]
 	if exists {
 		// return the already computed status
-		if klog.V(4) {
-			klog.Infof("    application %s already has status %s\n", computed.name, computed.kappnavStatVal)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    application %s already has status %s\n", computed.name, computed.kappnavStatVal))
 		}
 		return true, computed.kappnavStatVal, nil
 	}
@@ -237,8 +237,8 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 				resController.parseResource(unstructuredObj, resInfo)
 				if isComponentOfApplication(resController, appInfo, resInfo) {
 					// not self and labels match selector
-					if klog.V(4) {
-						klog.Infof("    found component: %s\n", resInfo.name)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    found component: %s\n", resInfo.name))
 					}
 
 					var stat string
@@ -256,8 +256,8 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 						}
 						if !ok {
 							// skip this one to avoid infinite recursion
-							if klog.V(4) {
-								klog.Infof("    skipping application: %s\n", resInfo.name)
+							if logger.IsEnabled(LogTypeDebug) {
+								logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    skipping application: %s\n", resInfo.name))
 							}
 							continue
 						}
@@ -275,9 +275,8 @@ func processOneApplication(resController *ClusterWatcher, res *resourceInfo, vis
 		}
 	}
 	status = checker.finalStatus()
-
-	if klog.V(4) {
-		klog.Infof("    processOneApplication final status for application %s %s %s is %s\n", appInfo.kind, appInfo.namespace, appInfo.name, status)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("    final status for application %s %s %s is %s\n", appInfo.kind, appInfo.namespace, appInfo.name, status))
 	}
 	return true, status, nil
 }
@@ -292,22 +291,22 @@ func processOneResource(resController *ClusterWatcher, resInfo *resourceInfo, ha
 	key := resInfo.key()
 	if res, ok := hasStatus[key]; ok {
 		// status already computed
-		if klog.V(4) {
-			klog.Infof("processOneResource status already computed  %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Status already computed  %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
 		}
 		return res.kappnavStatVal, nil
 	}
 	_, ok := toFetch[key]
 	if ok {
 		// Resource has changed. Compute status from api Server
-		if klog.V(4) {
-			klog.Infof("processOneResource fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
 		}
 		stat, flyover, flyoverNLS, err := resController.plugin.statusFunc(apiURL, resInfo)
 		if err != nil {
-			if klog.V(4) {
-				klog.Infof("processOneResource error fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
-				klog.Infof("%v\n", err)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Error fetching status for %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("%v\n", err))
 			}
 			return stat, err
 		}

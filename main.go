@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -28,7 +29,9 @@ import (
 
 	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -51,6 +54,7 @@ var (
 	routeV1Client *routev1.RouteV1Client
 	isLatestOKD   bool = false
 	isOKD         bool = false
+	logger = NewLogger(false) //create new logger and set enableJSONLog false (log in plain text) 
 )
 
 func init() {
@@ -61,62 +65,88 @@ func init() {
 		buf := make([]byte, 1<<20)
 		<-sigChan
 		stacklen := runtime.Stack(buf, true)
-		klog.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen]))
+		}
 		os.Exit(1)
 	}()
 }
 
 func main() {
-
 	flag.Parse()
 
 	var cfg *rest.Config
 	var err error
 	if strings.Compare(apiURL, "") != 0 {
 		// running outside of Kube cluster
-		klog.Infof("starting kappnav status controler outside cluster\n")
-		klog.Infof("masterURL: %s\n", masterURL)
-		klog.Infof("kubeconfig: %s\n", kubeconfig)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("starting kappnav status controler outside cluster\n"))
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("masterURL: %s\n", masterURL))
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("kubeconfig: %s\n", kubeconfig))
+		}
 		cfg, err = clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 		if err != nil {
-			klog.Fatal(err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+				os.Exit(255)
+			}
 		}
 	} else {
 		// running inside the Kube cluster
-		klog.Infof("starting kappnav status controler inside cluster\n")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "starting kappnav status controler inside cluster\n")
+		}
 		apiURL = kubeAPIURL
 		cfg, err = rest.InClusterConfig()
 		if err != nil {
-			klog.Fatal(err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+				os.Exit(255)
+			}
 		}
 	}
 
 	kubeClient, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatal(err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+			os.Exit(255)
+		}
 	}
 
 	var discClient = kubeClient.DiscoveryClient
 	var dynamicClient dynamic.Interface
 	dynamicClient, err = dynamic.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatal(err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+			os.Exit(255)
+		}
 	}
 
 	kubeEnv := os.Getenv("KUBE_ENV")
-	klog.Info("KUBE_ENV = " + kubeEnv)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, "KUBE_ENV = "+kubeEnv)
+	}
 	if kubeEnv == "minishift" || kubeEnv == "okd" || kubeEnv == "ocp" {
 		routeV1Client, err = routev1.NewForConfig(cfg)
 		if err != nil {
-			klog.Fatal(err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+				os.Exit(255)
+			}
 		}
 		groupLists, resourceLists, err := kubeClient.DiscoveryClient.ServerGroupsAndResources()
 		if err == nil && groupLists != nil && resourceLists != nil {
 			for _, resourceList := range resourceLists {
 				for _, resource := range resourceList.APIResources {
-					//klog.Info("Found resource kind = " + resource.Kind)
+					if logger.IsEnabled(LogTypeInfo) {
+						logger.Log(CallerName(), LogTypeInfo, "Found resource kind = "+resource.Kind)
+					}
 					if resource.Kind == OpenShiftWebConsoleConfig {
-						klog.Info("Found resource kind OpenShiftWebConsoleConfig, assuming OpenShift Container Platform" + resource.Kind)
+						if logger.IsEnabled(LogTypeInfo) {
+							logger.Log(CallerName(), LogTypeInfo, "Found resource kind OpenShiftWebConsoleConfig, assuming OpenShift Container Platform"+resource.Kind)
+						}
 						isLatestOKD = true
 						break
 					}
@@ -126,17 +156,70 @@ func main() {
 	}
 
 	plugin := &ControllerPlugin{dynamicClient, discClient, DefaultBatchDuration, calculateComponentStatus}
-	// resController, err := NewClusterWatcher(plugin)
+
+	//fetch kappnav CR and set init logging level before controller creates new cluster watcher to watch kappnav CR changes
+	setInitLoggingData(plugin.dynamicClient)
+
+	//create new cluster watcher
 	_, err = NewClusterWatcher(plugin)
 	if err != nil {
-		klog.Fatal(err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("%s", err))
+			os.Exit(255)
+		}
 	}
 
 	select {}
 }
 
+//fetch kappnav CR and set init logging level
+func setInitLoggingData(dynInterf dynamic.Interface) {
+	gvr := schema.GroupVersionResource{
+		Group:    "kappnav.operator.kappnav.io",
+		Version:  "v1",
+		Resource: "kappnavs",
+	}
+	var intfNoNS = dynInterf.Resource(gvr)
+	var intf dynamic.ResourceInterface
+	// get interface from kappnav namespace
+	intf = intfNoNS.Namespace(getkAppNavNamespace())
+
+	// fetch the kappnav custom resource obj
+	var unstructuredObj *unstructured.Unstructured
+	var resName = "kappnav"
+	unstructuredObj, _ = intf.Get(resName, metav1.GetOptions{})
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("kappnav CR obj %s ", unstructuredObj))
+	}
+	if unstructuredObj != nil {
+		var objMap = unstructuredObj.Object
+		if objMap != nil {
+			tmp, _ := objMap[SPEC]
+			spec := tmp.(map[string]interface{})
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("found kappnav CR spec %s ", spec))
+			}
+			// get the logging map from kappnav resource "spec" field
+			loggingMap, _ := spec["logging"]
+			// retrieve logging value of "controller" from logging map
+			if loggingMap != nil {
+				loggingValue := loggingMap.(map[string]interface{})["controller"].(string)
+				if len(loggingValue) > 0 {
+					if logger.IsEnabled(LogTypeInfo) {
+						logger.Log(CallerName(), LogTypeInfo, "Set the log level to "+loggingValue)
+					}
+					//invoke setLoggingLevel to reset log level
+					SetLoggingLevel(loggingValue)
+				}
+			}
+		}
+	}
+}
+
 func printEvent(event watch.Event) {
-	klog.Infof("event type %s, object type is %T\n", event.Type, event.Object)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("event type %s, object type is %T\n", event.Type, event.Object))
+	}
 	printEventObject(event.Object, "    ")
 }
 
@@ -146,51 +229,77 @@ func printEventObject(obj interface{}, indent string) {
 		var unstructuredObj = obj.(*unstructured.Unstructured)
 		// printObject(unstructuredObj.Object, indent)
 		printUnstructuredJSON(unstructuredObj.Object, indent)
-		klog.Infof("\n")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "\n")
+		}
 	default:
-		klog.Infof("%snot Unstructured: type: %T val: %s\n", indent, obj, obj)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%snot Unstructured: type: %T val: %s\n", indent, obj, obj))
+		}
 	}
 }
 
 func printUnstructuredJSON(obj interface{}, indent string) {
 	data, err := json.MarshalIndent(obj, "", indent)
 	if err != nil {
-		klog.Fatalf("JSON Marshaling failed %s", err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("JSON Marshaling failed %s", err))
+			os.Exit(255)
+		}
 	}
-	klog.Infof("%s\n", data)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s\n", data))
+	}
 }
 
 func printObject(obj interface{}, indent string) {
 	nextIndent := indent + "    "
 	switch obj.(type) {
 	case int:
-		klog.Infof("%d", obj.(int))
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%d", obj.(int)))
+		}
 	case bool:
-		klog.Infof("%t", obj.(bool))
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%t", obj.(bool)))
+		}
 	case float64:
-		klog.Infof("%f", obj.(float64))
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%f", obj.(float64)))
+		}
 	case string:
-		klog.Infof("%s", obj.(string))
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s", obj.(string)))
+		}
 	case []interface{}:
 		var arr = obj.([]interface{})
 		for index, elem := range arr {
-			klog.Infof("\n%sindex:%d, type %T, ", indent, index, elem)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("\n%sindex:%d, type %T, ", indent, index, elem))
+			}
+
 			printObject(elem, nextIndent)
 		}
 	case map[string]interface{}:
 		var objMap = obj.(map[string]interface{})
 		for label, val := range objMap {
-			klog.Infof("\n%skey: %s type: %T| ", indent, label, val)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("\n%skey: %s type: %T| ", indent, label, val))
+			}
 			printObject(val, nextIndent)
 		}
 	default:
-		klog.Infof("\n%stype: %T val: %s", indent, obj, obj)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("\n%stype: %T val: %s", indent, obj, obj))
+		}
 	}
 }
 
 func printPods(pods *corev1.PodList) {
 	for _, pod := range pods.Items {
-		klog.Infof("%s", pod.ObjectMeta.Name)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s", pod.ObjectMeta.Name))
+		}
 	}
 }
 
@@ -204,7 +313,33 @@ func init() {
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&apiURL, "apiURL", "", "The address of the kAppNav API server.")
 
-	// init falgs for klog
+	// init flags for klog
 	klog.InitFlags(nil)
+}
 
+//SetLoggingLevel get logging level value from CR and reset the logger level
+func SetLoggingLevel(loginfo string) {
+	switch loginfo { 
+	case "info":
+		logger.SetLogLevel(LogLevelInfo)
+		break
+	case "debug":
+		logger.SetLogLevel(LogLevelDebug)
+		break
+	case "error":
+		logger.SetLogLevel(LogLevelError)
+		break
+	case "warning":
+		logger.SetLogLevel(LogLevelWarning)
+		break
+	case "entry":
+		logger.SetLogLevel(LogLevelEntry)
+		break
+	case "all":
+		logger.SetLogLevel(LogLevelAll)
+		break
+	case "none":
+		logger.SetLogLevel(LogLevelNone)
+		break
+	}	
 }

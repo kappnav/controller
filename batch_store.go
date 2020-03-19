@@ -17,10 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
-
-	"k8s.io/klog"
 )
 
 /*
@@ -155,15 +154,15 @@ func (ts *batchStore) getNextBatch() (*batchResources, bool) {
 			ts.mutex.Lock()
 			if !open {
 				// channel closed
-				if klog.V(4) {
-					klog.Infof("batchStore.getNextBatch channel closed\n")
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, "Channel closed\n")
 				}
 				ts.done = true
 				ts.mutex.Unlock()
 				return nil, false
 			}
-			if klog.V(4) {
-				klog.Infof("batchStore.getNextBatch received %d applications and %d resources\n", len(resources.applications), len(resources.nonApplications))
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Received %d applications and %d resources\n", len(resources.applications), len(resources.nonApplications)))
 			}
 			for _, resInfo := range resources.applications {
 				ts.store.applications[resInfo.key()] = resInfo
@@ -177,8 +176,8 @@ func (ts *batchStore) getNextBatch() (*batchResources, bool) {
 		case <-ts.timerChan:
 			ts.mutex.Lock()
 			// If we are here, there is something in the store
-			if klog.V(4) {
-				klog.Infof("batchStore.getNextBatch timer popped applications %d, resources %d\n", len(ts.store.applications), len(ts.store.nonApplications))
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Timer popped applications %d, resources %d\n", len(ts.store.applications), len(ts.store.nonApplications)))
 			}
 			if ts.done {
 				ts.mutex.Unlock()
@@ -212,20 +211,20 @@ func (ts *batchStore) putBack(resources *batchResources, putbackError error) {
 			// not currently in the store
 			_, exists, err := ts.resController.getResource(res.gvr, res.namespace, res.name)
 			if err != nil {
-				if klog.V(4) {
-					klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err))
 				}
 			} else {
 				if exists {
 					// resource still exists. Put it back to be retried
-					if klog.V(4) {
-						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name))
 					}
 					ts.store.applications[key] = res
 					numPutBack++
 				} else {
-					if klog.V(4) {
-						klog.Infof("batchStor not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name))
 					}
 				}
 			}
@@ -236,18 +235,20 @@ func (ts *batchStore) putBack(resources *batchResources, putbackError error) {
 			// not currently in the store
 			_, exists, err := ts.resController.getResource(res.gvr, res.namespace, res.name)
 			if err != nil {
-				klog.Errorf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error getting resource %s %s %s from cache %s\n", res.gvr, res.namespace, res.name, err))
+				}
 			} else {
 				if exists {
 					// resource still exists. Put it back to be retried
-					if klog.V(4) {
-						klog.Infof("batchStore putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Putting back %s %s %s to be retried\n", res.gvr, res.namespace, res.name))
 					}
 					ts.store.nonApplications[key] = res
 					numPutBack++
 				} else {
-					if klog.V(4) {
-						klog.Infof("batchStore.putBack: not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Not putting back %s %s %s as it no longer exists\n", res.gvr, res.namespace, res.name))
 					}
 				}
 			}
@@ -264,15 +265,15 @@ func (ts *batchStore) putBack(resources *batchResources, putbackError error) {
    process resources in the store
 */
 func (ts *batchStore) run() {
-	if klog.V(2) {
-		klog.Infof("batchStore.run started\n")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "batchStore.run started\n")
 	}
 	for {
 		if resources, ok := ts.getNextBatch(); ok {
 			if err := processBatchOfApplicationsAndResources(ts, resources); err != nil {
 				// put them back for retry later
-				if klog.V(4) {
-					klog.Errorf("Putting back resources due to error %s\n", err)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Putting back resources due to error %s\n", err))
 				}
 				// TODO: can we put back only a subset
 				ts.putBack(resources, err)
@@ -282,7 +283,7 @@ func (ts *batchStore) run() {
 			break
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("batchStore.run stopped\n")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "Stopped\n")
 	}
 }

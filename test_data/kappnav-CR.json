@@ -1,0 +1,29 @@
+{
+	"apiVersion": "kappnav.operator.kappnav.io/v1",
+	"kind": "Kappnav",
+	"metadata": {
+		"name": "kappnav"
+	},
+	"spec": {
+		"appNavAPI": {
+			"repository": "kappnav/apis",
+			"tag": "KAPPNAV_VERSION"
+		},
+		"appNavController": {
+			"repository": "kappnav/controller",
+			"tag": "KAPPNAV_VERSION"
+		},
+		"appNavUI": {
+			"repository": "kappnav/ui",
+			"tag": "KAPPNAV_VERSION"
+		},
+		"env": {
+			"kubeEnv": "ocp"
+		},
+		"logging": {
+			"apis": "info",
+			"operator": "info",
+			"controller": "all"
+		}
+	}
+}

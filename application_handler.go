@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
 )
 
 // Return true if labels1 and labels2 are the same
@@ -60,72 +59,74 @@ func sameLabels(labels1 map[string]string, labels2 map[string]string) bool {
 // labels: labels in the resource
 // Return false if matchLabels is nil or empty
 func labelsMatch(matchLabels map[string]string, labels map[string]string) bool {
-	if klog.V(5) {
-		klog.Infof("labelsMatch: matchLabels %s, labels: %s\n", matchLabels, labels)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("matchLabels %s, labels: %s\n", matchLabels, labels))
 	}
 	if matchLabels == nil || len(matchLabels) == 0 {
-		if klog.V(5) {
-			klog.Infof("labelsMatch: false\n")
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, "false\n ")
 		}
 		return false
 	}
 	for key, val := range matchLabels {
 		otherVal, ok := labels[key]
 		if !ok {
-			if klog.V(5) {
-				klog.Infof("labelsMatch: false\n")
+			if logger.IsEnabled(LogTypeExit) {
+				logger.Log(CallerName(), LogTypeExit, "false\n ")
 			}
 			return false
 		}
 		if strings.Compare(val, otherVal) != 0 {
-			if klog.V(5) {
-				klog.Infof("labelsMatch: false\n")
+			if logger.IsEnabled(LogTypeExit) {
+				logger.Log(CallerName(), LogTypeExit, "false\n ")
 			}
 			return false
 		}
 	}
 	// everything match
-	if klog.V(5) {
-		klog.Infof("labelsMatch: true\n")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "true\n ")
 	}
 	return true
 }
 
 // Return true if input group and kind are contained in array of groupKind
 func isContainedIn(arr []groupKind, resInfo *resourceInfo) bool {
-	if klog.V(2) {
-		klog.Infof("isContainedIn entry resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr))
 	}
 	group := getGroupFromAPIVersion(resInfo.apiVersion)
 	for _, gk := range arr {
-		if klog.V(2) {
-			klog.Infof("isContainedIn gk.kind: %s gk.group %s\n", gk.kind, gk.group)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("gk.kind: %s gk.group %s\n", gk.kind, gk.group))
 		}
 		if strings.Compare(gk.kind, resInfo.kind) == 0 &&
 			strings.Compare(gk.group, group) == 0 {
-			if klog.V(2) {
-				klog.Infof("isContainedIn exit true resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+			if logger.IsEnabled(LogTypeExit) {
+				logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("exit true resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr))
 			}
 			return true
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("isContainedIn exit false resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("exit false resInfo.kind: %s resInfo.apiVersion %s groupKinds: %v\n", resInfo.kind, resInfo.apiVersion, arr))
 	}
 	return false
 }
 
 func getGroupFromAPIVersion(apiVersion string) string {
-	if klog.V(2) {
-		klog.Infof("getGroupFromAPIVersion entry apiVersion: %s\n", apiVersion)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("apiVersion: %s\n", apiVersion))
 	}
 	var group string
 	if strings.Contains(apiVersion, "/") {
 		split := strings.Split(apiVersion, "/")
 		group = split[0]
 	}
-	if klog.V(2) {
-		klog.Infof("getGroupFromAPIVersion apiVersion: %s group: %s\n", apiVersion, group)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("apiVersion: %s group: %s\n", apiVersion, group))
 	}
 	return group
 }
@@ -143,12 +144,12 @@ func isContainedInStringArray(arr []string, inStr string) bool {
 // Return true if labels match the given expressions
 // Return false if expressions is nil or empty
 func expressionsMatch(expressions []matchExpression, labels map[string]string) bool {
-	if klog.V(5) {
-		klog.Infof("expressionsMatch: expressions: %s len:%d, labels: %s\n", expressions, len(expressions), labels)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("expressions: %s len:%d, labels: %s\n", expressions, len(expressions), labels))
 	}
 	if expressions == nil || len(expressions) == 0 {
-		if klog.V(5) {
-			klog.Info("expressionsMatch: nil or empty expressions")
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, "nil or empty expressions")
 		}
 		return false
 	}
@@ -158,44 +159,45 @@ func expressionsMatch(expressions []matchExpression, labels map[string]string) b
 		case OperatorIn:
 			if !ok || !isContainedInStringArray(expr.values, value) {
 				// not in
-				if klog.V(5) {
-					klog.Infof("expressionsMatch: false\n")
+				if logger.IsEnabled(LogTypeExit) {
+					logger.Log(CallerName(), LogTypeExit, "false\n")
 				}
 				return false
 			}
 		case OperatorNotIn:
 			if !ok || isContainedInStringArray(expr.values, value) {
 				// label deos notexists or there is a match
-				if klog.V(5) {
-					klog.Infof("expressionsMatch: false\n")
+				if logger.IsEnabled(LogTypeExit) {
+					logger.Log(CallerName(), LogTypeExit, "false\n")
 				}
 				return false
 			}
 		case OperatorExists:
 			if !ok {
 				// does not exist
-				if klog.V(5) {
-					klog.Infof("expressionsMatch: false\n")
+				if logger.IsEnabled(LogTypeExit) {
+					logger.Log(CallerName(), LogTypeExit, "false\n")
 				}
 				return false
 			}
 		case OperatorDoesNotExist:
 			if ok {
 				// exists
-				if klog.V(5) {
-					klog.Infof("expressionsMatch: false\n")
+				if logger.IsEnabled(LogTypeExit) {
+					logger.Log(CallerName(), LogTypeExit, "false\n")
 				}
 				return false
 			}
 		default:
-			if klog.V(5) {
-				klog.Infof("expressionsMatch: false\n")
+			if logger.IsEnabled(LogTypeExit) {
+				logger.Log(CallerName(), LogTypeExit, "false\n")
 			}
 			return false
 		}
 	}
-	if klog.V(5) {
-		klog.Infof("expressionsMatch: true\n")
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "true\n")
 	}
 	return true
 }
@@ -223,28 +225,28 @@ func resourceNamespaceMatchesApplicationComponentNamespaces(resController *Clust
 
 // Return true if the resource is a component of the application
 func isComponentOfApplication(resController *ClusterWatcher, appResInfo *appResourceInfo, resInfo *resourceInfo) bool {
-	if klog.V(4) {
-		klog.Infof("isComponentOfApplication app: %s, resource: %s\n", appResInfo.name, resInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("app: %s, resource: %s\n", appResInfo.name, resInfo.name))
 	}
 
 	if !resourceNamespaceMatchesApplicationComponentNamespaces(resController, appResInfo, resInfo.namespace) {
-		if klog.V(4) {
-			klog.Infof("    isComponentOfApplication false due to namespace: resource is %s/%s, application is %s/%s, component namespaces is: %s", resInfo.namespace, resInfo.name, appResInfo.namespace, appResInfo.name, appResInfo.componentNamespaces)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("false due to namespace: resource is %s/%s, application is %s/%s, component namespaces is: %s", resInfo.namespace, resInfo.name, appResInfo.namespace, appResInfo.name, appResInfo.componentNamespaces))
 		}
 		return false
 	}
 
 	if isSameResource(&appResInfo.resourceInfo, resInfo) {
 		// self
-		if klog.V(4) {
-			klog.Infof("    isComponentOfApplication false: resource is self\n")
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("false: resource is self\n"))
 		}
 		return false
 	}
 	if !isContainedIn(appResInfo.componentKinds, resInfo) {
 		// resource kind not what the application wants to include
-		if klog.V(4) {
-			klog.Infof("    isComponentOfApplication false: component kinds: %v, resource apiVersion: %s kind: %s \n", appResInfo.componentKinds, resInfo.apiVersion, resInfo.kind)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("false: component kinds: %v, resource apiVersion: %s kind: %s \n", appResInfo.componentKinds, resInfo.apiVersion, resInfo.kind))
 		}
 		return false
 	}
@@ -268,16 +270,17 @@ func isComponentOfApplication(resController *ClusterWatcher, appResInfo *appReso
 	} else {
 		ret = false
 	}
-	if klog.V(4) {
-		klog.Infof("    isComponentOfApplication %t\n", ret)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%t\n", ret))
 	}
 	return ret
 }
 
 // Delete given resource from Kube
 func deleteResource(resController *ClusterWatcher, resInfo *resourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("deleteResource GVR: %s namespace: %s name: %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("GVR: %s namespace: %s name: %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
 	}
 	gvr, ok := resController.getWatchGVR(resInfo.gvr)
 	if ok {
@@ -293,22 +296,23 @@ func deleteResource(resController *ClusterWatcher, resInfo *resourceInfo) error 
 		var err error
 		err = intf.Delete(resInfo.name, nil)
 		if err != nil {
-			if klog.V(4) {
-				klog.Infof("    deleteResource error: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err)
+			if logger.IsEnabled(LogTypeExit) {
+				logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("error: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err))
 			}
 			return err
 		}
 	}
-	if klog.V(4) {
-		klog.Infof("    deleteResource success: %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("success: %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
 	}
 	return nil
 }
 
 // Check if resource is deleted
 func resourceDeleted(resController *ClusterWatcher, resInfo *resourceInfo) (bool, error) {
-	if klog.V(4) {
-		klog.Infof("resourceDeleted  %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf(" %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name))
 	}
 
 	gvr, ok := resController.getWatchGVR(resInfo.gvr)
@@ -328,8 +332,8 @@ func resourceDeleted(resController *ClusterWatcher, resInfo *resourceInfo) (bool
 			return false, fmt.Errorf("Resource %s %s %s not deleted", resInfo.gvr, resInfo.namespace, resInfo.name)
 		}
 		// TODO: better checking between error and resource deleted
-		if klog.V(4) {
-			klog.Infof("    resourceDeleted true: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("    true: %s %s %s %s\n", resInfo.gvr, resInfo.namespace, resInfo.name, err))
 		}
 		return true, nil
 	}
@@ -338,8 +342,8 @@ func resourceDeleted(resController *ClusterWatcher, resInfo *resourceInfo) (bool
 
 // Return applications for which a resource is a direct sub-component
 func getApplicationsForResource(resController *ClusterWatcher, resInfo *resourceInfo) []*appResourceInfo {
-	if klog.V(4) {
-		klog.Infof("getApplicationsForResource: %s\n", resInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("%s\n", resInfo.name))
 	}
 	var ret = make([]*appResourceInfo, 0)
 	// loop over all applications
@@ -348,19 +352,24 @@ func getApplicationsForResource(resController *ClusterWatcher, resInfo *resource
 		var unstructuredObj = app.(*unstructured.Unstructured)
 		var appResInfo = &appResourceInfo{}
 		if err := resController.parseAppResource(unstructuredObj, appResInfo); err == nil {
-			if klog.V(4) {
-				klog.Infof("    checking application: %s\n", appResInfo.name)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    checking application: %s\n", appResInfo.name))
 			}
 			if isComponentOfApplication(resController, appResInfo, resInfo) {
-				if klog.V(4) {
-					klog.Infof("    found application: %s\n", appResInfo.name)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    found application: %s\n", appResInfo.name))
 				}
 				ret = append(ret, appResInfo)
 			}
 		} else {
 			// shouldn't happen
-			klog.Errorf("Unable to parse application resource %s\n", err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to parse application resource %s\n", err))
+			}
 		}
+	}
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%v", ret))
 	}
 	return ret
 }
@@ -403,13 +412,15 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 	applications := make(map[string]*resourceInfo)
 	nonApplications := make(map[string]*resourceInfo)
 	if err != nil {
-		klog.Errorf("fetching key %s from store failed: %v", key, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("fetching key %s from store failed: %v", key, err))
+		}
 		return err
 	}
 	if !exists {
 		// delete resource
-		if klog.V(3) {
-			klog.Infof("    processing deleted resource %s\n", key)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing deleted resource %s\n", key))
 		}
 		// batch up all parent applications
 		findAllApplicationsForResource(resController, eventData.obj, applications)
@@ -417,8 +428,8 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 		var resInfo = &resourceInfo{}
 		resController.parseResource(eventData.obj.(*unstructured.Unstructured), resInfo)
 		if eventData.funcType == UpdateFunc {
-			if klog.V(3) {
-				klog.Infof("    processig updated resource : %s\n", key)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processig updated resource : %s\n", key))
 			}
 			var oldResInfo = &resourceInfo{}
 			resController.parseResource(eventData.oldObj.(*unstructured.Unstructured), oldResInfo)
@@ -427,8 +438,8 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 				findAllApplicationsForResource(resController, eventData.oldObj, applications)
 			}
 		} else {
-			if klog.V(3) {
-				klog.Infof("   processing added resource: %s\n", key)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("   processing added resource: %s\n", key))
 			}
 		}
 		// find all ancestors
@@ -441,8 +452,8 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 		applications:    applications,
 		nonApplications: nonApplications,
 	}
-	if klog.V(3) {
-		klog.Infof("    Sending %d applications and %d resources on channel\n", len(resourceToBatch.applications), len(resourceToBatch.nonApplications))
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    Sending %d applications and %d resources on channel\n", len(resourceToBatch.applications), len(resourceToBatch.nonApplications)))
 	}
 	resController.resourceChannel.send(&resourceToBatch)
 	return nil
@@ -451,8 +462,8 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 // Start watching component kinds of the application. Also put
 // application on batch of applications to recalculate status
 func startWatchApplicationComponentKinds(resController *ClusterWatcher, obj interface{}, applications map[string]*resourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("startWatchApplicationComponentKinds: %T %s\n", obj, obj)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%T %s\n", obj, obj))
 	}
 	switch obj.(type) {
 	case *unstructured.Unstructured:
@@ -495,31 +506,34 @@ func startWatchApplicationComponentKinds(resController *ClusterWatcher, obj inte
 // Handle application changes
 // TODO: Do not add applications to be processed if only kappnav status changed
 var batchApplicationHandler resourceActionFunc = func(resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
-	if klog.V(4) {
-		klog.Infof("batchApplicationHander\n")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "\n")
 	}
 
 	key := eventData.key
 	obj, exists, err := rw.store.GetByKey(key)
 	if err != nil {
-		klog.Errorf("   batchApplicationhandler fetching key %s failed: %v", key, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("   fetching key %s failed: %v", key, err))
+		}
 		return err
 	}
 	applications := make(map[string]*resourceInfo)
 	nonApplications := make(map[string]*resourceInfo)
 	if !exists {
 		// application is gone. Update parent applications
-		if klog.V(3) {
-			klog.Infof("    processing application deleted: %s\n", key)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing application deleted: %s\n", key))
 		}
 		// batch up all ancestor applications
 		findAllApplicationsForResource(resController, eventData.obj, applications)
 	} else {
 		if eventData.funcType == UpdateFunc {
 			// application updated
-			if klog.V(3) {
-				klog.Infof("    processing application updated: %s\n", key)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing application updated: %s\n", key))
 			}
+
 			var oldResInfo = &resourceInfo{}
 			resController.parseResource(eventData.oldObj.(*unstructured.Unstructured), oldResInfo)
 			var newResInfo = &resourceInfo{}
@@ -531,13 +545,15 @@ var batchApplicationHandler resourceActionFunc = func(resController *ClusterWatc
 			// changes affects which sub-components are included in calculation
 			findAllApplicationsForResource(resController, eventData.oldObj, applications)
 		} else {
-			if klog.V(3) {
-				klog.Infof("    processing application added: %s\n", key)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing application added: %s\n", key))
 			}
 		}
 		err = startWatchApplicationComponentKinds(resController, obj, applications)
 		if err != nil {
-			klog.Errorf("    process application error %s\n", err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("    process application error %s\n", err))
+			}
 			return err
 		}
 		findAllApplicationsForResource(resController, eventData.obj, applications)
@@ -546,8 +562,8 @@ var batchApplicationHandler resourceActionFunc = func(resController *ClusterWatc
 		applications:    applications,
 		nonApplications: nonApplications,
 	}
-	if klog.V(3) {
-		klog.Infof("    Sending %d applications and %d resources on channel\n", len(resourceToBatch.applications), len(resourceToBatch.nonApplications))
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("    Sending %d applications and %d resources on channel\n", len(resourceToBatch.applications), len(resourceToBatch.nonApplications)))
 	}
 	resController.resourceChannel.send(&resourceToBatch)
 

@@ -18,10 +18,14 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -224,10 +228,58 @@ func (sl *samplingLogger) logError(err error) {
 	if now.Sub(sl.lastOutput) >= sl.interval {
 		// enough time elapsed since last output
 		sl.lastOutput = now
-		klog.Error(err)
+		if logger.IsEnabled(LogTypeError) {
+			str := fmt.Sprintf("%s", err)
+			logger.Log(CallerName(), LogTypeError, str)
+		}
 	}
 }
 
 func logString(str string) string {
 	return "\"" + str + "\""
+}
+
+// CallerName get the caller program file name, line number and function name in "fileName:line# funcName"
+func CallerName() string {
+	var callerName string
+	pc, fileName, line, _ := runtime.Caller(1)
+
+	// get function name
+	funcNameFull := runtime.FuncForPC(pc).Name()
+	funcNameEnd := filepath.Ext(funcNameFull)
+	funcName := strings.TrimPrefix(funcNameEnd, ".")
+
+	// get file name
+	suffix := ".go"
+	_, nf := filepath.Split(fileName)
+	if strings.HasSuffix(nf, ".go") {
+		fileName = strings.TrimSuffix(nf, suffix)
+		callerName = fileName + suffix + ":" + strconv.Itoa(line) + " " + funcName
+	}
+	return callerName
+}
+
+//ErrorWithStack print stack trace for error message
+func ErrorWithStack(msg string) string {
+	cause := errors.New(msg)
+	err := errors.WithStack(cause)
+	s := fmt.Sprintf("%+v", err)
+	return s
+}
+
+//Find check if an element in the slice
+func Find(slice []string, val string) (int, bool) {
+	for i, item := range slice {
+		if item == val {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+//FormatTimestamp with unix seconds in float format i.e. 1584628925.9396136
+func FormatTimestamp(t time.Time) float64 {	
+	s := fmt.Sprintf("%10.7f", float64(t.UnixNano())/1e9)
+	ts, _ := strconv.ParseFloat(s, 64)
+	return ts
 }

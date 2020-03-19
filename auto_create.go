@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
 )
 
 const (
@@ -158,8 +157,8 @@ func stringToNamespaceSet(inStr string) map[string]string {
 		if isValidName {
 			ret[val] = val
 		} else {
-			if klog.V(2) {
-				klog.Infof("stringToNamespaceSet %s is not a valid namespace name", val)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf(" %s is not a valid namespace name", val))
 			}
 		}
 	}
@@ -210,7 +209,9 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		resourceInfo.autoCreateName, ok = tmp.(string)
 		if !ok {
-			klog.Errorf("Metadata %s for resource %s/%s is not a string. Using default.", AppAutoCreateName, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s is not a string. Using default.", AppAutoCreateName, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
+			}
 			resourceInfo.autoCreateName = resourceInfo.name
 		} else {
 			resourceInfo.autoCreateName = toDomainName(resourceInfo.autoCreateName)
@@ -223,12 +224,16 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		autoCreateKindsStr, ok := tmp.(string)
 		if !ok {
-			klog.Errorf("Metadata %s for resource %s/%s is not a string of comma separated kinds. Using default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s is not a string of comma separated kinds. Using default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
+			}
 			resourceInfo.autoCreateKinds = defaultKinds
 		} else {
 			arrayOfString := stringToArrayOfAlphaNumeric(autoCreateKindsStr)
 			if len(arrayOfString) == 0 {
-				klog.Errorf("Metadata %s for resource %s/%s does not contain comma separated kinds. Its current value is %s. Switching to default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name, autoCreateKindsStr)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s does not contain comma separated kinds. Its current value is %s. Switching to default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name, autoCreateKindsStr))
+				}
 				resourceInfo.autoCreateKinds = defaultKinds
 			} else {
 				/* Transform array of string to array of groupKind */
@@ -242,8 +247,8 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 					if len(split) > 1 {
 						group = split[0]
 						kind = split[1]
-						if klog.V(4) {
-							klog.Infof("parseAutoCreateResourceInfo using group: %s kind: %s from kappnav.app.auto-create.kinds entry: %s", group, kind, val)
+						if logger.IsEnabled(LogTypeDebug) {
+							logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using group: %s kind: %s from kappnav.app.auto-create.kinds entry: %s", group, kind, val))
 						}
 						gvr, ok = resController.getWatchGVRForKind(kind)
 					} else {
@@ -252,20 +257,20 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 						gvr, ok = resController.getWatchGVRForKind(kind)
 						if ok {
 							group = gvr.Group
-							if klog.V(4) {
-								klog.Infof("parseAutoCreateResourceInfo using group: %s from watch GVR for kind: %s", group, kind)
+							if logger.IsEnabled(LogTypeDebug) {
+								logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using group: %s from watch GVR for kind: %s", group, kind))
 							}
 						} else {
 							gvr, ok = coreKindToGVR[val]
 							if ok {
 								group = gvr.Group
-								if klog.V(4) {
-									klog.Infof("parseAutoCreateResourceInfo using group: #s from default GVR for core kind: %s, using default group: App", val)
+								if logger.IsEnabled(LogTypeDebug) {
+									logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using group: #s from default GVR for core kind: %s, using default group: App", val))
 								}
 							} else {
 								group = "apps"
-								if klog.V(4) {
-									klog.Infof("parseAutoCreateResourceInfo no GVR found for kind: %s, using default group: apps", val)
+								if logger.IsEnabled(LogTypeDebug) {
+									logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("No GVR found for kind: %s, using default group: apps", val))
 								}
 							}
 						}
@@ -273,8 +278,8 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 					if (gvr != schema.GroupVersionResource{}) {
 						resourceInfo.autoCreateKinds = append(resourceInfo.autoCreateKinds, groupKind{group, val, nil})
 					} else {
-						if klog.V(4) {
-							klog.Infof("parseAutoCreateResourceInfo no GVR found for kappnav.app.auto-create.kinds entry: %s, skipping", val)
+						if logger.IsEnabled(LogTypeDebug) {
+							logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("No GVR found for kappnav.app.auto-create.kinds entry: %s, skipping", val))
 						}
 					}
 				}
@@ -288,7 +293,9 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		resourceInfo.autoCreateVersion, ok = tmp.(string)
 		if !ok {
-			klog.Errorf("Metadata %s for resources %s/%s is not a string. Using default.", AppAutoCreateVersion, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resources %s/%s is not a string. Using default.", AppAutoCreateVersion, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
+			}
 			resourceInfo.autoCreateVersion = defaultAutoCreateAppVersion
 		}
 	}
@@ -299,7 +306,9 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		resourceInfo.autoCreateLabel, ok = tmp.(string)
 		if !ok {
-			klog.Errorf("Metadata %s for resoruce %s/%s is not a string. Using default.", AppAutoCreateLabel, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resoruce %s/%s is not a string. Using default.", AppAutoCreateLabel, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
+			}
 			resourceInfo.autoCreateLabel = defaultAutoCreateAppLabel
 		} else {
 			resourceInfo.autoCreateLabel = toLabel(resourceInfo.autoCreateLabel)
@@ -312,12 +321,16 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		autoCreateValuesStr, ok := tmp.(string)
 		if !ok {
-			klog.Errorf("Metadata %s for resource %s/%s does not contain comma separted label values. Using default.", AppAutoCreateLabelValues, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s does not contain comma separted label values. Using default.", AppAutoCreateLabelValues, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
+			}
 			resourceInfo.autoCreateLabelValues = []string{resourceInfo.autoCreateName}
 		} else {
 			labelValues := stringToArrayOfLabelValues(autoCreateValuesStr)
 			if len(labelValues) == 0 {
-				klog.Errorf("Metadata %s for resource %s/%s does not contain comma separated label values. Its current value: %s.  Using default.", AppAutoCreateLabelValues, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name, autoCreateValuesStr)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s does not contain comma separated label values. Its current value: %s.  Using default.", AppAutoCreateLabelValues, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name, autoCreateValuesStr))
+				}
 				resourceInfo.autoCreateLabelValues = []string{resourceInfo.autoCreateName}
 			} else {
 				resourceInfo.autoCreateLabelValues = labelValues
@@ -334,28 +347,33 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 	key := eventData.key
 	_, exists, err := rw.store.GetByKey(key)
 	if err != nil {
-		klog.Errorf("fetching key %s from store failed: %v", key, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("fetching key %s from store failed: %v", key, err))
+		}
 		return err
 	}
 
-	if klog.V(5) {
-		klog.Infof("autoCreateAppHandler Processing %d current object: %s", eventData.funcType, eventData.obj.(*unstructured.Unstructured))
-		if eventData.funcType == UpdateFunc {
-			klog.Infof("autoCreateAppHandler Processing %d old object : %s", eventData.funcType, eventData.oldObj.(*unstructured.Unstructured))
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Processing %d current object: %s", eventData.funcType, eventData.obj.(*unstructured.Unstructured)))
+	}
+	if eventData.funcType == UpdateFunc {
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Processing %d old object : %s", eventData.funcType, eventData.oldObj.(*unstructured.Unstructured)))
 		}
 	}
+
 	resourceInfo := resController.parseAutoCreateResourceInfo(eventData.obj.(*unstructured.Unstructured))
 	if resourceInfo == nil {
-		if klog.V(5) {
-			klog.Infof("autoCreateAppHandler: not a resource to auto-create")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Not a resource to auto-create"))
 		}
 		// not an auto-create resource
 		if eventData.funcType == UpdateFunc {
 			oldResInfo := resController.parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
 			if oldResInfo != nil {
 				/* Went from auto-created to not auto-created */
-				if klog.V(2) {
-					klog.Infof("Applications no longer auto-created for resource %s, kind: %s. Deleting existing auto-created application", key, oldResInfo.kind)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Applications no longer auto-created for resource %s, kind: %s. Deleting existing auto-created application", key, oldResInfo.kind))
 				}
 				deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo)
 			}
@@ -364,22 +382,22 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 	}
 	if !exists {
 		// resource deleted
-		if klog.V(3) {
-			klog.Infof("    processing deleted resource %s", key)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing deleted resource %s", key))
 		}
 		// Delete all auto-created applications
 		deleteAutoCreatedApplicationsForResource(resController, rw, resourceInfo)
 	} else if eventData.funcType == UpdateFunc || eventData.funcType == AddFunc {
-		if klog.V(3) {
-			klog.Infof("processing add/update resource : %s, kind: %s", key, resourceInfo.kind)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("processing add/update resource : %s, kind: %s", key, resourceInfo.kind))
 		}
 
 		if eventData.funcType == UpdateFunc {
 			oldResInfo := resController.parseAutoCreateResourceInfo(eventData.oldObj.(*unstructured.Unstructured))
 			if oldResInfo != nil {
 				if oldResInfo.autoCreateName != resourceInfo.autoCreateName {
-					if klog.V(2) {
-						klog.Infof("Auto-created application for resource kind %s, name %s changed from %s to %s. Deleting existing auto-created application", resourceInfo.kind, key, oldResInfo.autoCreateName, resourceInfo.autoCreateName)
+					if logger.IsEnabled(LogTypeInfo) {
+						logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Auto-created application for resource kind %s, name %s changed from %s to %s. Deleting existing auto-created application", resourceInfo.kind, key, oldResInfo.autoCreateName, resourceInfo.autoCreateName))
 					}
 					// name of auto created resource changed. Deleted the old
 					deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo)
@@ -388,12 +406,14 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 		}
 		err := autoCreateModifyApplication(resController, rw, resourceInfo)
 		if err != nil {
-			klog.Errorf("Error processing processig add/update resource %s: %s", key, err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error processing processig add/update resource %s: %s", key, err))
+			}
 			return err
 		}
 	} else {
-		if klog.V(5) {
-			klog.Infof("autoCreateAppHandler skipping event")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "Skipping event")
 		}
 	}
 	return nil
@@ -424,20 +444,20 @@ func getAutoCreatedFromParams(annotations map[string]interface{}) (string, strin
 func applicationAutoCreatedFromResource(appResource *appResourceInfo, resInfo *autoCreateResourceInfo) bool {
 	annotations, ok := appResource.metadata[ANNOTATIONS]
 	if !ok {
-		if klog.V(5) {
-			klog.Infof("applicationAutoCreatedFromResource: missing annotations")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "Missing annotations")
 		}
 		return false
 	}
 	fromName, fromKind, ok := getAutoCreatedFromParams(annotations.(map[string]interface{}))
 	if !ok {
-		if klog.V(5) {
-			klog.Infof("applicationAutoCreatedFromResource: missing created-from name or kind")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "Missing created-from name or kind")
 		}
 		return false
 	}
-	if klog.V(5) {
-		klog.Infof("applicationAutoCreatedFromResource: app namesapce: %s, created-from name: %s, kind: %s; resource namespace: %s, name: %s, kind: %s", appResource.namespace, fromName, fromKind, resInfo.namespace, resInfo.name, resInfo.kind)
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("app namesapce: %s, created-from name: %s, kind: %s; resource namespace: %s, name: %s, kind: %s", appResource.namespace, fromName, fromKind, resInfo.namespace, resInfo.name, resInfo.kind))
 	}
 	if appResource.resourceInfo.namespace == resInfo.resourceInfo.namespace && fromKind == resInfo.kind && fromName == resInfo.name {
 		return true
@@ -446,8 +466,8 @@ func applicationAutoCreatedFromResource(appResource *appResourceInfo, resInfo *a
 }
 
 func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw *ResourceWatcher, resInfo *autoCreateResourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("Deleting auto-created application %s/%s", resInfo.namespace, resInfo.autoCreateName)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("Deleting auto-created application %s/%s", resInfo.namespace, resInfo.autoCreateName))
 	}
 
 	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
@@ -466,28 +486,32 @@ func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw 
 		unstructuredObj, err = intf.Get(resInfo.autoCreateName, metav1.GetOptions{})
 		if err != nil {
 			/* Most likely resource does not exist */
-			klog.Infof("Error getting application to be deleted %s/%s. Error:%s", resInfo.namespace, resInfo.autoCreateName, err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error getting application to be deleted %s/%s. Error:%s", resInfo.namespace, resInfo.autoCreateName, err))
+			}
 			return nil
 		}
 
 		var appResInfo = &appResourceInfo{}
 		resController.parseAppResource(unstructuredObj, appResInfo)
 		if applicationAutoCreatedFromResource(appResInfo, resInfo) {
-			if klog.V(4) {
-				klog.Infof("    deleting application: %s/%s", appResInfo.namespace, appResInfo.name)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    deleting application: %s/%s", appResInfo.namespace, appResInfo.name))
 			}
 			err := deleteResource(resController, &appResInfo.resourceInfo)
 			if err != nil {
-				klog.Errorf("Error deleting application: %s %s %s. Error: %s", resInfo.kind, resInfo.namespace, resInfo.name, err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error deleting application: %s %s %s. Error: %s", resInfo.kind, resInfo.namespace, resInfo.name, err))
+				}
 			} else {
-				if klog.V(2) {
-					klog.Infof("Deleted auto-created application %s/%s", appResInfo.namespace, appResInfo.name)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Deleted auto-created application %s/%s", appResInfo.namespace, appResInfo.name))
 				}
 			}
 			return err
 		}
-		if klog.V(4) {
-			klog.Infof("    application %s/%s not auto-created", appResInfo.namespace, appResInfo.name)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("application %s/%s not auto-created", appResInfo.namespace, appResInfo.name))
 		}
 	}
 
@@ -495,8 +519,8 @@ func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw 
 }
 
 func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatcher, resInfo *autoCreateResourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("autoCreateModifyApplication from %s/%s", resInfo.resourceInfo.namespace, resInfo.resourceInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("From %s/%s", resInfo.resourceInfo.namespace, resInfo.resourceInfo.name))
 	}
 	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if ok {
@@ -519,41 +543,46 @@ func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatc
 		}
 
 		/* If we get here, modify the  applications */
-		if klog.V(5) {
-			klog.Infof("autoCreateModifyApplication: checking existing application %s", unstructuredObj)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Checking existing application %s", unstructuredObj))
 		}
 		appResInfo := &appResourceInfo{}
 		err = resController.parseAppResource(unstructuredObj, appResInfo)
 		if err != nil {
-			klog.Errorf("parseApplication error %s", err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("parseApplication error %s", err))
+			}
 			return err
 		}
 		if !autoGenerated(appResInfo) {
 			autoGenErr := fmt.Errorf("Unable to update application %s/%s as it was not auto-generated", resInfo.namespace, resInfo.name)
-			klog.Error(autoGenErr)
+			if logger.IsEnabled(LogTypeError) {
+				str := fmt.Sprintf("%s", autoGenErr)
+				logger.Log(CallerName(), LogTypeError, str)
+			}
 			return autoGenErr
 		}
 
 		if autoCreatedApplicationNeedsUpdate(appResInfo, resInfo) {
 			// change status
-			if klog.V(2) {
-				klog.Infof("Changing autocreated application annotations and labels for %s/%s", resInfo.namespace, resInfo.autoCreateName)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Changing autocreated application annotations and labels for %s/%s", resInfo.namespace, resInfo.autoCreateName))
 			}
 			setApplicationAnnotationLabels(unstructuredObj, resInfo)
 			_, err = intf.Update(unstructuredObj, metav1.UpdateOptions{})
 			if err != nil {
-				if klog.V(2) {
-					klog.Errorf("    error modifying application%s", err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("    error modifying application%s", err))
 				}
 			} else {
-				if klog.V(2) {
-					klog.Infof("Updated auto-created application %s/%s", resInfo.namespace, resInfo.autoCreateName)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Updated auto-created application %s/%s", resInfo.namespace, resInfo.autoCreateName))
 				}
 			}
 			return err
 		}
-		if klog.V(5) {
-			klog.Infof("Application does not need update")
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, "Application does not need update")
 		}
 		return nil
 	}
@@ -630,8 +659,8 @@ func getApplicationJSON(resInfo *autoCreateResourceInfo) string {
 
 /* Create application. Assume it does not already exist */
 func createApplication(resController *ClusterWatcher, rw *ResourceWatcher, resInfo *autoCreateResourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("Creating application %s/%s, from %s", resInfo.namespace, resInfo.autoCreateName, resInfo.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "Creating application "+resInfo.namespace+"/"+resInfo.autoCreateName+", from "+resInfo.name)
 	}
 	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if ok {
@@ -644,29 +673,34 @@ func createApplication(resController *ClusterWatcher, rw *ResourceWatcher, resIn
 		}
 
 		template := getApplicationJSON(resInfo)
-
-		if klog.V(4) {
-			klog.Infof("createApplication JSON: %s", template)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("createApplication JSON: %s", template))
 		}
 		var unstructuredObj = &unstructured.Unstructured{}
 		err := unstructuredObj.UnmarshalJSON([]byte(template))
 		if err != nil {
-			klog.Errorf("Unable to convert JSON %s to unstructured", template)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to convert JSON %s to unstructured", template))
+			}
 			return err
 		}
 
 		_, err = intf.Create(unstructuredObj, metav1.CreateOptions{})
 		if err != nil {
-			klog.Errorf("Unable to create Application %s/%s error: %s", resInfo.namespace, resInfo.autoCreateName, err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to create Application %s/%s error: %s", resInfo.namespace, resInfo.autoCreateName, err))
+			}
 			return err
 		}
 	} else {
 		err := fmt.Errorf("Unable to get GVR for Application")
-		klog.Errorf("Unable to create Application %s/%s.  Error: %s", resInfo.namespace, resInfo.autoCreateName, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to create Application %s/%s.  Error: %s", resInfo.namespace, resInfo.autoCreateName, err))
+		}
 		return err
 	}
-	if klog.V(2) {
-		klog.Infof("Created application %s/%s", resInfo.namespace, resInfo.autoCreateName)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Created application %s/%s", resInfo.namespace, resInfo.autoCreateName))
 	}
 	return nil
 }
@@ -817,22 +851,22 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 
 	/* Check if labels have changed */
 	if appResInfo.labels[resInfo.autoCreateLabel] != resInfo.autoCreateName {
-		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate labels mismatch. Label: %s, label value in app: %s label value in original resource: %s", resInfo.autoCreateLabel, appResInfo.labels[resInfo.autoCreateLabel], resInfo.autoCreateName)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Labels mismatch. Label: %s, label value in app: %s label value in original resource: %s", resInfo.autoCreateLabel, appResInfo.labels[resInfo.autoCreateLabel], resInfo.autoCreateName))
 		}
 		return true
 	}
 	if appResInfo.labels[labelVersion] != resInfo.autoCreateVersion {
-		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate version mismatch. version label %s in app: %s. Version in original resource: %s", labelVersion, appResInfo.labels[labelVersion], resInfo.autoCreateVersion)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Version mismatch. version label %s in app: %s. Version in original resource: %s", labelVersion, appResInfo.labels[labelVersion], resInfo.autoCreateVersion))
 		}
 		return true
 	}
 
 	// check if component kinds have changed
 	if !sameComponentKinds(appResInfo.componentKinds, resInfo.autoCreateKinds) {
-		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate component kinds mismatch. In app: %v In original resource: %v", appResInfo.componentKinds, resInfo.autoCreateKinds)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Component kinds mismatch. In app: %v In original resource: %v", appResInfo.componentKinds, resInfo.autoCreateKinds))
 		}
 		return true
 	}
@@ -842,22 +876,22 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 	lenMatchExpressions := len(appResInfo.matchExpressions)
 	if lenMatchLabels > 0 && lenMatchExpressions > 0 {
 		// shouldn't happen
-		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate : created app contains both match labels and expressions")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Created app contains both match labels and expressions"))
 		}
 		return true
 	}
 	if lenMatchLabels == 1 {
 		if len(resInfo.autoCreateLabelValues) != 1 {
 			// number of labels don't match
-			if klog.V(5) {
-				klog.Infof("auttoCreatedApplicationNeedsUpdate application has 1 match label value, but original resource has %d label values", len(resInfo.autoCreateLabelValues))
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Application has 1 match label value, but original resource has %d label values", len(resInfo.autoCreateLabelValues)))
 			}
 			return true
 		}
 		if appResInfo.matchLabels[resInfo.autoCreateLabel] != resInfo.autoCreateLabelValues[0] {
-			if klog.V(5) {
-				klog.Infof("auttoCreatedApplicationNeedsUpdate match label values mismatch. Created app: %s: %s, original resource: %s", resInfo.autoCreateLabel, appResInfo.matchLabels[resInfo.autoCreateLabel], resInfo.autoCreateLabelValues[0])
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match label values mismatch. Created app: %s: %s, original resource: %s", resInfo.autoCreateLabel, appResInfo.matchLabels[resInfo.autoCreateLabel], resInfo.autoCreateLabelValues[0]))
 			}
 			// labels don't match
 			return true
@@ -865,28 +899,28 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 	} else if lenMatchExpressions == 1 {
 		matchExpression := appResInfo.matchExpressions[0]
 		if matchExpression.key != resInfo.autoCreateLabel {
-			if klog.V(5) {
-				klog.Infof("autoCreatedApplicationNeedsUpdate match expression key mismatch. Created app key: %s, original resource key: %s", matchExpression.key, resInfo.autoCreateLabel)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match expression key mismatch. Created app key: %s, original resource key: %s", matchExpression.key, resInfo.autoCreateLabel))
 			}
 			return true
 		}
 		if matchExpression.operator != OperatorIn {
-			if klog.V(5) {
-				klog.Infof("auttoCreatedApplicationNeedsUpdate  create app operation is not %s", OperatorIn)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Create app operation is not %s", OperatorIn))
 			}
 			return true
 		}
 
 		if !sameStringArray(matchExpression.values, resInfo.autoCreateLabelValues) {
-			if klog.V(5) {
-				klog.Infof("auttoCreatedApplicationNeedsUpdate mismatched expression values. Create app values: %s, original resource values: %s", stringArrayToString(matchExpression.values), stringArrayToString(resInfo.autoCreateLabelValues))
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Mismatched expression values. Create app values: %s, original resource values: %s", stringArrayToString(matchExpression.values), stringArrayToString(resInfo.autoCreateLabelValues)))
 			}
 			return true
 		}
 	} else {
 		// shouldn't happen
-		if klog.V(5) {
-			klog.Infof("auttoCreatedApplicationNeedsUpdate neither match label nor match express is length 1")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Neither match label nor match express is length 1"))
 		}
 		return true
 	}
@@ -907,7 +941,9 @@ func resourceExisting(dynamicClient dynamic.Interface, namespace string, name st
 	// fetch the current resource
 	_, err := intf.Get(name, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("resourceExisting error: %s, type: %T", err, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error: %s, type: %T", err, err))
+		}
 		return false
 	}
 	return true
@@ -916,14 +952,16 @@ func resourceExisting(dynamicClient dynamic.Interface, namespace string, name st
 /* Delte auto-creqated applications  whose original resource no longer exists
  */
 func deleteOrphanedAutoCreatedApplications(resController *ClusterWatcher) error {
-	if klog.V(4) {
-		klog.Infof("Deleting orphaned auto-crated application\n")
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, "Deleting orphaned auto-created application\n")
 	}
 
 	gvr, ok := resController.getWatchGVR(coreApplicationGVR)
 	if !ok {
 		err := fmt.Errorf("Unable to get GVR for Application")
-		klog.Errorf("Error in deleteOrphanedAutoCreatedApplications: %s", err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error in deleteOrphanedAutoCreatedApplications: %s", err))
+		}
 		return err
 	}
 	var intf = resController.plugin.dynamicClient.Resource(gvr)
@@ -943,8 +981,8 @@ func deleteOrphanedAutoCreatedApplications(resController *ClusterWatcher) error 
 		if err != nil {
 			continue
 		}
-		if klog.V(4) {
-			klog.Infof("    deleteOrphanedAutoCreatedApplications checking application: %s\n", appResInfo.name)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    deleteOrphanedAutoCreatedApplications checking application: %s\n", appResInfo.name))
 		}
 
 		annotationsObj, ok := appResInfo.metadata[ANNOTATIONS]
@@ -964,21 +1002,23 @@ func deleteOrphanedAutoCreatedApplications(resController *ClusterWatcher) error 
 
 		fromGVR, ok := resController.getWatchGVRForKind(fromKind)
 		if !ok {
-			if klog.V(5) {
-				klog.Errorf("Error in deleteOrphanedAutoCreatedApplications: Unable to find GVR for %s", fromKind)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error in deleteOrphanedAutoCreatedApplications: Unable to find GVR for %s", fromKind))
 			}
 			continue
 		}
 		if !resourceExisting(resController.plugin.dynamicClient, appResInfo.namespace, fromName, fromGVR) {
-			if klog.V(4) {
-				klog.Infof("    deleting application: %s/%s created from name: %s kind: %s\n", appResInfo.namespace, appResInfo.name, fromName, fromKind)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    deleting application: %s/%s created from name: %s kind: %s\n", appResInfo.namespace, appResInfo.name, fromName, fromKind))
 			}
 			err := deleteResource(resController, &appResInfo.resourceInfo)
 			if err != nil {
-				klog.Errorf("Error deleting orphaned application:  %s/%s. Error: %s\n", appResInfo.namespace, appResInfo.name, err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error deleting orphaned application:  %s/%s. Error: %s\n", appResInfo.namespace, appResInfo.name, err))
+				}
 			} else {
-				if klog.V(2) {
-					klog.Infof("Deleted orphaned auto-created application %s/%s\n", appResInfo.namespace, appResInfo.name)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Deleted orphaned auto-created application %s/%s\n", appResInfo.namespace, appResInfo.name))
 				}
 			}
 		}
