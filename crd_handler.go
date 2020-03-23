@@ -77,3 +77,13 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 	}
 	return nil
 }
+
+// isKAppNavMonitoredResource returns true if the resource is one
+// we should always create kappnav status annotations for
+func isKAppNavMonitoredResource(resInfo *resourceInfo) bool {
+	result := resInfo.gvr == coreApplicationGVR
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%v %s ", result, resInfo.gvr))
+	}
+	return result
+}

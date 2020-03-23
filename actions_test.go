@@ -253,10 +253,10 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 		} else {
 			// fetch the current resource
 			unstructuredObj, err = intf.Get(resInfo.name, metav1.GetOptions{})
-			if logger.IsEnabled(LogTypeDebug) {
-				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("reading resource %s from Kube, error: %s", resInfo.name, err))
-			}
 			if err != nil {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("reading resource %s from Kube, error: %s", resInfo.name, err))
+				}
 				return err
 			}
 		}
