@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"k8s.io/klog"
 )
 
 // function to calculate component status.
@@ -34,7 +32,6 @@ var client = &http.Client{}
 
 /* Call API server to calculate component status */
 func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status string, flyover string, flyoverNLS string, retErr error) {
-
 	status = ""
 	flyover = ""
 	flyoverNLS = ""
@@ -42,13 +39,14 @@ func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status str
 	apiVersion := resInfo.apiVersion
 	if !strings.Contains(apiVersion, "/") {
 		apiVersion = "/" + apiVersion
-		if klog.V(4) {
-			klog.Infof("calculateComponentStatus using apiVersion: %s instead of %s", apiVersion, resInfo.apiVersion)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using apiVersion: %s instead of %s", apiVersion, resInfo.apiVersion))
 		}
 	}
 	urlPath := destURL + "/kappnav/status/" + resInfo.name + "/" + resInfo.kind + "?namespace=" + query + "&apiversion=" + url.QueryEscape(apiVersion)
-	if klog.V(4) {
-		klog.Infof("calculateComponentStatus urlPath: %s", urlPath)
+
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("urlPath: %s", urlPath))
 	}
 	resp, retErr := client.Get(urlPath)
 	if retErr != nil {
@@ -57,7 +55,7 @@ func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", "", fmt.Errorf("calculateComponentStatus failed. status: %s urlPath: %s", resp.Status, urlPath)
+		return "", "", "", fmt.Errorf("Failed. status: %s urlPath: %s", resp.Status, urlPath)
 	}
 	var result interface{}
 	retErr = json.NewDecoder(resp.Body).Decode(&result)
@@ -65,8 +63,8 @@ func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status str
 		return
 	}
 
-	if klog.V(4) {
-		klog.Infof("calculateComponentStatus: type is: %T\n", result)
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("type is: %T\n", result))
 	}
 	switch result.(type) {
 	case map[string]interface{}:
@@ -85,17 +83,18 @@ func calculateComponentStatus(destURL string, resInfo *resourceInfo) (status str
 		if ok {
 			bytes, err := json.Marshal(tmp)
 			if err != nil {
-				klog.Errorf("Unable to marshal flyover.nls: %s", tmp)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to marshal flyover.nls: %s", tmp))
+				}
 			} else {
 				flyoverNLS = string(bytes)
 			}
 		}
 	default:
-		retErr = fmt.Errorf("calculateComponentStatus failed: don't know how to process returned object of type %T", result)
+		retErr = fmt.Errorf("Failed: don't know how to process returned object of type %T", result)
 	}
-
-	if klog.V(4) {
-		klog.Infof("calculateComponentStatus url: %s, kind: %s, namespace: %s, name: %s: status: %s, flyover: %s, flyovernLS: %s, err: %s", destURL, resInfo.kind, resInfo.namespace, resInfo.name, status, flyover, flyoverNLS, retErr)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("url: %s, kind: %s, namespace: %s, name: %s: status: %s, flyover: %s, flyovernLS: %s, err: %s", destURL, resInfo.kind, resInfo.namespace, resInfo.name, status, flyover, flyoverNLS, retErr))
 	}
 	return
 }

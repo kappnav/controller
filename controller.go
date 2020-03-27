@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
 )
 
 /* kAppNav Status Controller
@@ -242,12 +241,16 @@ var (
 		Version:  "v1",
 		Resource: "nodes",
 	}
+	coreKappNavGVR = schema.GroupVersionResource{
+		Group:    "kappnav.operator.kappnav.io",
+		Version:  "v1",
+		Resource: "kappnavs",
+	}
 )
 
 func init() {
-
-	if klog.V(2) {
-		klog.Infof("init")
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, "init")
 	}
 
 	coreKindToGVR = make(map[string]schema.GroupVersionResource)
@@ -271,12 +274,15 @@ func init() {
 	coreKindToGVR["StorageClass"] = coreStorageClassGVR
 	coreKindToGVR["Endpoint"] = coreEndpointGVR
 	coreKindToGVR["Node"] = coreNodeGVR
+	coreKindToGVR["Kappnav"] = coreKappNavGVR
 }
 
 func logStack(msg string) {
 	buf := make([]byte, 4096)
 	len := runtime.Stack(buf, false)
-	klog.Infof("BEGIN STACK %s\n%s\nEND STACK\n", msg, buf[:len])
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("BEGIN STACK %s\n%s\nEND STACK\n", msg, buf[:len]))
+	}
 }
 
 // ControllerPlugin contains dependencies to the controller that can be mocked by unit test
@@ -305,7 +311,6 @@ type ClusterWatcher struct {
 
 // NewClusterWatcher creates a new ClusterWatcher
 func NewClusterWatcher(controllerPlugin *ControllerPlugin) (*ClusterWatcher, error) {
-
 	var resController = &ClusterWatcher{}
 	resController.plugin = controllerPlugin
 	resController.handlerMgr = newHandlerManager()
@@ -334,20 +339,21 @@ func NewClusterWatcher(controllerPlugin *ControllerPlugin) (*ClusterWatcher, err
 	// start watch CRD
 	gvr, ok := resController.getWatchGVR(coreCustomResourceDefinitionGVR)
 	if !ok {
-		if klog.V(4) {
-			klog.Infof("NewClusterWatcher error getting GVR: %s, returning nil", coreCustomResourceDefinitionGVR)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Error getting GVR: %s, returning nil", coreCustomResourceDefinitionGVR))
 		}
 		return nil, nil
 	}
+
 	err = resController.AddToWatch(gvr)
 	if err != nil {
-		if klog.V(4) {
-			klog.Infof("NewClusterWatcher error adding GVR: %s to watch, returning nil", coreCustomResourceDefinitionGVR)
+		if logger.IsEnabled(LogTypeExit) {
+			logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Error adding GVR: %s to watch, returning nil", coreCustomResourceDefinitionGVR))
 		}
 		return nil, err
 	}
-	if klog.V(4) {
-		klog.Infof("NewClusterWatcher exit success")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "Exit success")
 	}
 	return resController, nil
 }
@@ -392,12 +398,10 @@ func fetchDataFromConfigMap(dynInterf dynamic.Interface) ([]string, string, map[
 	if !ok {
 		return nil, "", nil, fmt.Errorf("Configmap kappnav-config status-unknown not a string")
 	}
-
 	appStatPreced, ok := dataMap[appStatusPrecedence]
 	if !ok {
 		return nil, "", nil, fmt.Errorf("Configmap kappnav-config does not contain app-status-precedence property")
 	}
-
 	statusPrecedence, ok := appStatPreced.(string)
 	if !ok {
 		return nil, "", nil, fmt.Errorf("Configmap kappnav-config app-status-precedence not a JSON array")
@@ -451,9 +455,10 @@ func (resController *ClusterWatcher) getStatusPrecedence() []string {
 
 // Return true if a gvr is namespaced
 func (resController *ClusterWatcher) isNamespaced(gvr schema.GroupVersionResource) bool {
-	if klog.V(4) {
-		klog.Infof("isNamespaced %s", gvr)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("%s", gvr))
 	}
+
 	resController.mutex.Lock()
 	defer resController.mutex.Unlock()
 
@@ -464,17 +469,16 @@ func (resController *ClusterWatcher) isNamespaced(gvr schema.GroupVersionResourc
 		// TODO: in theory checking whether a reousrce is namespaced
 		// when resource doesn't exist shouldn't happen
 	}
-
-	if klog.V(4) {
-		klog.Infof("isNamespaced %s: %t", gvr, ret)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%s: %t", gvr, ret))
 	}
 	return ret
 }
 
 // isNamespacePermitted returns true if resources in given namespace are allowed in this kappnav instance
 func (resController *ClusterWatcher) isNamespacePermitted(namespace string) bool {
-	if klog.V(4) {
-		klog.Infof("isNamespacePermitted %s", namespace)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("%s", namespace))
 	}
 	var ret = false
 
@@ -485,8 +489,9 @@ func (resController *ClusterWatcher) isNamespacePermitted(namespace string) bool
 		// Namespace must be in kappnav-config Configmap app-namespaces
 		ret = true
 	}
-	if klog.V(4) {
-		klog.Infof("isNamespacePermitted %s: %t", namespace, ret)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%s: %t", namespace, ret))
 	}
 	return ret
 }
@@ -500,28 +505,28 @@ func (resController *ClusterWatcher) isEventPermitted(eventData *eventHandlerDat
 	} else {
 		ret = true
 	}
-	if klog.V(4) {
-		klog.Infof("isEventPermitted gvr: %s key: %s: return: %t", eventData.gvr, eventData.key, ret)
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("gvr: %s key: %s: return: %t", eventData.gvr, eventData.key, ret))
 	}
 	return ret
 }
 
 // isAllNamespacesPermitted returns true if resources in all namespaces are allowed in this kappnav instance
 func (resController *ClusterWatcher) isAllNamespacesPermitted() bool {
-	if klog.V(4) {
-		klog.Infof("isAllNamespacesPermitted")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "")
 	}
 	var ret = len(resController.namespaces) == 0
-	if klog.V(4) {
-		klog.Infof("isAllNamespacesPermitted %t:", ret)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%t:", ret))
 	}
 	return ret
 }
 
 // AddToWatch adds a GVR to the watch list
 func (resController *ClusterWatcher) AddToWatch(gvr schema.GroupVersionResource) error {
-	if klog.V(3) {
-		klog.Infof("AddToWatch %s\n", gvr)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf(" %s\n", gvr))
 	}
 
 	resController.mutex.Lock()
@@ -558,16 +563,16 @@ func processNextItem(resController *ClusterWatcher, watcher *ResourceWatcher /*,
 	// Wait until there is a new item in the queue
 	tmp, quit := watcher.queue.Get()
 	if quit {
-		if klog.V(2) {
-			klog.Infof("queue for GVR %s closed", watcher.GroupVersionResource)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("queue for GVR %s closed", watcher.GroupVersionResource))
 		}
 		return false
 	}
 	defer watcher.queue.Done(tmp)
 
 	handlerData := tmp.(*eventHandlerData)
-	if klog.V(4) {
-		klog.Infof("processing %s, GVR %s from queue", handlerData.key, watcher.GroupVersionResource)
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("processing %s, GVR %s from queue", handlerData.key, watcher.GroupVersionResource))
 	}
 
 	// call handler to process the data
@@ -577,7 +582,7 @@ func processNextItem(resController *ClusterWatcher, watcher *ResourceWatcher /*,
 	return true
 }
 
-// Handle potential error when proessing resource from the queue
+// Handle potential error when processing resource from the queue
 func handleError(watcher *ResourceWatcher, err error, handlerData *eventHandlerData) {
 	if err == nil {
 		// no error
@@ -587,8 +592,8 @@ func handleError(watcher *ResourceWatcher, err error, handlerData *eventHandlerD
 
 	if watcher.queue.NumRequeues(handlerData) < retryLimit {
 		// requeue for retry
-		if klog.V(4) {
-			klog.Errorf("Error processing %v: %v. Requeueing", handlerData.key, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error processing %v: %v. Requeueing", handlerData.key, err))
 		}
 		watcher.queue.AddRateLimited(handlerData)
 		return
@@ -603,7 +608,9 @@ func handleError(watcher *ResourceWatcher, err error, handlerData *eventHandlerD
 func (resController *ClusterWatcher) getWatchGVRForKind(kind string) (schema.GroupVersionResource, bool) {
 	gvr, ok := coreKindToGVR[kind]
 	if !ok {
-		klog.Infof("getWatchGVRForKind kind: %s is not a core kappnav kind", kind)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("kind: %s is not a core kappnav kind", kind))
+		}
 		return schema.GroupVersionResource{}, false
 	}
 	return resController.getWatchGVR(gvr)
@@ -617,15 +624,17 @@ func (resController *ClusterWatcher) getWatchGVR(gvr schema.GroupVersionResource
 	resController.mutex.Unlock()
 	if ok {
 		if rw.GroupVersionResource != gvr {
-			if klog.V(4) {
-				klog.Infof("getWatchGVR watched GVR: %s different from input GVR: %s", rw.GroupVersionResource, gvr)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Watched GVR: %s different from input GVR: %s", rw.GroupVersionResource, gvr))
 			}
 		}
 		return rw.GroupVersionResource, true
 	}
-	if klog.V(4) {
-		klog.Infof("getWatchGVR GVR: %s not found in resourceMap returning false", gvr)
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("GVR: %s not found in resourceMap returning false", gvr))
 	}
+
 	return schema.GroupVersionResource{}, false
 }
 
@@ -633,32 +642,32 @@ func (resController *ClusterWatcher) getGVRsForGroupKind(group string, kind stri
 	// map group/kind to apiVersion
 
 	groupKind := group + "/" + kind
-	if klog.V(2) {
-		klog.Infof("getGVRsForGroupKind trying group/Kind: %s", groupKind)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("Trying group/Kind: %s", groupKind))
 	}
 	gvrs, ok := resController.groupKindToGVR.Load(groupKind)
 	if ok {
-		if klog.V(2) {
-			klog.Infof("getGVRsForGroupKind for group: %s kind: %s returning GVRs: %v", group, kind, gvrs.(map[schema.GroupVersionResource]schema.GroupVersionResource))
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("getGVRsForGroupKind for group: %s kind: %s returning GVRs: %v", group, kind, gvrs.(map[schema.GroupVersionResource]schema.GroupVersionResource)))
 		}
 		return gvrs.(map[schema.GroupVersionResource]schema.GroupVersionResource), group, true
 	}
-	if klog.V(2) {
-		klog.Infof("getGVRsForGroupKind WARNING: No CRD found with group: " + group + " for kind: " + kind)
+	if logger.IsEnabled(LogTypeWarning) {
+		logger.Log(CallerName(), LogTypeWarning, "No CRD found with group: "+group+" for kind: "+kind)
 	}
 	// no CRDs installed with the specified group/kind
 	// See if it's one of the core kinds for compatibility
 	gvr, ok := coreKindToGVR[kind]
 	if ok {
-		if klog.V(2) {
-			klog.Infof("getGVRsForGroupKind returning default GVR for group: %s kind: %s GVRs: %v", group, kind, gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Returning default GVR for group: %s kind: %s GVRs: %v", group, kind, gvr))
 		}
 		gvrSet := make(map[schema.GroupVersionResource]schema.GroupVersionResource, 1)
 		gvrSet[gvr] = gvr
 		return gvrSet, gvr.Group, true
 	}
-	if klog.V(2) {
-		klog.Infof("getGVRsForGroupKind returning false - no CRD found for group: %s kind: %s", group, kind)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Returning false - no CRD found for group: %s kind: %s", group, kind))
 	}
 	return nil, "", false
 }
@@ -703,18 +712,13 @@ func (resController *ClusterWatcher) getResource(gvr schema.GroupVersionResource
 		}
 		return store.GetByKey(key)
 	}
-	return nil, false, fmt.Errorf("GetResource unable to find resources %s %s %s", gvr, namespace, name)
+	return nil, false, fmt.Errorf("Unable to find resources %s %s %s", gvr, namespace, name)
 }
 
 // add a new entry to resource map
 func (resController *ClusterWatcher) addResourceMapEntry(kind string, group string, version string, plural string, namespaced bool) {
-
-	// if kind == "" || strings.HasPrefix(plural, "%") {
-	// 	klog.Infof("addResourceMapEntry skipping resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
-	// 	return
-	// }
-	if klog.V(3) {
-		klog.Infof("addResourceMapEntry entry resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("resource kind: %s, group: %s, version: %s, plural: %s namespaced: %t", logString(kind), logString(group), logString(version), logString(plural), namespaced))
 	}
 	var subResource string
 	if strings.Contains(plural, "/") {
@@ -741,8 +745,9 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 		gvrSet.(map[schema.GroupVersionResource]schema.GroupVersionResource)[gvr] = gvr
 		resController.groupKindToGVR.Store(groupKind, gvrSet)
 	}
-	if klog.V(2) {
-		klog.Infof("addResourceMapEntry mapping apiVersion/Kind: %s to GVR: %v", apiVersionKind, gvr)
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Mapping apiVersion/Kind: %s to GVR: %v", apiVersionKind, gvr))
 	}
 	resController.apiVersionKindToGVR.Store(apiVersionKind, gvr)
 	rw.Group = group
@@ -760,8 +765,9 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 		resController.mutex.Unlock()
 		resController.restartWatch(rw.GroupVersionResource)
 	}
-	if klog.V(3) {
-		klog.Infof("addResourceMapEntry exit")
+
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "")
 	}
 }
 
@@ -785,21 +791,21 @@ func (resController *ClusterWatcher) deleteResourceMapEntry(gvr schema.GroupVers
 		existingGvr, ok := resController.groupKindToGVR.Load(groupKind)
 		if ok {
 			if ok && existingGvr != gvr {
-				if klog.V(2) {
-					klog.Infof("deleteResourceMapEntry group/Kind map GVR: %s is not the GVR to be deleted: %s", existingGvr, gvr)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("group/Kind map GVR: %s is not the GVR to be deleted: %s", existingGvr, gvr))
 				}
 				delete = false
 			}
 		}
 		if delete == true {
-			if klog.V(2) {
-				klog.Infof("deleteResourceMapEntry deleting group/Kind: %s for GVR: %s", groupKind, gvr)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Deleting group/Kind: %s for GVR: %s", groupKind, gvr))
 			}
 			resController.groupKindToGVR.Delete(apiVersionKind)
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("deleteResourceMapEntry deleting apiVersion/Kind: %s for GVR: %s", apiVersionKind, gvr)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("Deleting apiVersion/Kind: %s for GVR: %s", apiVersionKind, gvr))
 	}
 	resController.apiVersionKindToGVR.Delete(apiVersionKind)
 
@@ -816,36 +822,43 @@ func (resController *ClusterWatcher) printResourceMapEntry(gvr schema.GroupVersi
 	resController.mutex.Unlock()
 	if ok {
 		keys := store.ListKeys()
-		if klog.V(2) {
-			klog.Infof("printResourceMapEntry for gvr %s\n", gvr)
-			klog.Infof("    keys: %s\n", keys)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("gvr %s\n", gvr))
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    keys: %s\n", keys))
 		}
 	} else {
-		klog.Infof("printResourceMapEntry gvr %s not found in resourceMap\n", gvr)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("gvr %s not found in resourceMap\n", gvr))
+		}
 	}
 }
 
 func printAPIGroupList(list *metav1.APIGroupList) {
-	if klog.V(2) {
-		klog.Infof("printAPIGroupList\n")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "")
 	}
-	klog.Infof("    kind: %s, APIVersion %s\n", list.Kind, list.APIVersion)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    kind: %s, APIVersion %s\n", list.Kind, list.APIVersion))
+	}
 	for index, group := range list.Groups {
-		if klog.V(2) {
-			klog.Infof("    %d kind: %s APIVersion %s Name %s\n", index, group.Kind, group.APIVersion, group.Name)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    %d kind: %s APIVersion %s Name %s\n", index, group.Kind, group.APIVersion, group.Name))
 		}
 		for _, version := range group.Versions {
-			if klog.V(2) {
-				klog.Infof("        groupVersion: %s, version: %s\n", version.GroupVersion, version.Version)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("        groupVersion: %s, version: %s\n", version.GroupVersion, version.Version))
 			}
 		}
+	}
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "")
 	}
 }
 
 /* Initialize list of resource group/api/version */
 func (resController *ClusterWatcher) initResourceMap() error {
-	if klog.V(2) {
-		klog.Infof("initResourceMap entry")
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "")
 	}
 	var discClient = resController.plugin.discoveryClient
 	var apiGroups *metav1.APIGroupList
@@ -853,27 +866,27 @@ func (resController *ClusterWatcher) initResourceMap() error {
 	if err != nil {
 		return err
 	}
-	if klog.V(4) {
-		printAPIGroupList(apiGroups)
-	}
+
+	printAPIGroupList(apiGroups)
+
 	var groups = apiGroups.Groups
 	var group metav1.APIGroup
 	for _, group = range groups {
-		// kube 1.16 / OCP 4.3 added apiextensions.k8s.io/v1	
-		// so can no longer use only the preferred version.	
-		if group.Name == "apiextensions.k8s.io" {	
+		// kube 1.16 / OCP 4.3 added apiextensions.k8s.io/v1
+		// so can no longer use only the preferred version.
+		if group.Name == "apiextensions.k8s.io" {
 			for i := 0; i < len(group.Versions); i++ {
-				if klog.V(2) {
-					klog.Infof("initResourceMap processing apiextensions.k8s.io GroupVersion %s", group.Versions[i].GroupVersion)
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Processing apiextensions.k8s.io GroupVersion %s", group.Versions[i].GroupVersion))
 				}
 				resController.processResourceGroup(group.Versions[i].GroupVersion, discClient)
 			}
-		} else {	
-			resController.processResourceGroup(group.PreferredVersion.GroupVersion, discClient)	
-		}	
+		} else {
+			resController.processResourceGroup(group.PreferredVersion.GroupVersion, discClient)
+		}
 	}
-	if klog.V(2) {
-		klog.Infof("initResourceMap exit")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "")
 	}
 	return nil
 }
@@ -882,7 +895,9 @@ func (resController *ClusterWatcher) processResourceGroup(groupVersion string, d
 	apiResourceList, err := discClient.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		// If this groupVersion is not available, then disregard it
-		klog.Errorf("initResourceMap unable to get information about APIGroup %s, skipping", groupVersion)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to get information about APIGroup %s, skipping", groupVersion))
+		}
 		return err
 	}
 	var group string
@@ -926,9 +941,8 @@ type eventHandlerData struct {
 // Start watch on a GVR, if it should be watched, and not already being watched
 // Otherwise, noop
 func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionResource) error {
-
-	if klog.V(4) {
-		klog.Infof("startWatch entry group: %s version: %s resource: %s\n    groupversion: %s groupresource: %s", inputGVR.Group, inputGVR.Version, inputGVR.Resource, inputGVR.GroupVersion(), inputGVR.GroupResource())
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("Entry group: %s version: %s resource: %s\n    groupversion: %s groupresource: %s", inputGVR.Group, inputGVR.Version, inputGVR.Resource, inputGVR.GroupVersion(), inputGVR.GroupResource()))
 	}
 
 	resController.mutex.Lock()
@@ -938,8 +952,8 @@ func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionReso
 
 	// not ready to watch this GVR
 	if !resController.gvrsToWatch[gvr] {
-		if klog.V(4) {
-			klog.Infof("startWatch returning nil, no gvrsToWatch")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "Returning nil, no gvrsToWatch")
 		}
 		return nil
 	}
@@ -947,20 +961,21 @@ func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionReso
 	rw, ok := resController.resourceMap[gvr]
 	if !ok {
 		// no entry for this resource GVR yet
-		if klog.V(4) {
-			klog.Infof("startWatch returning nil, no resourceMap entry for gvr: %v", gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Returning nil, no resourceMap entry for gvr: %v", gvr))
 		}
+
 		return nil
 	}
 	if rw.controller != nil {
 		// already being watched
-		if klog.V(4) {
-			klog.Infof("startWatch returning nil, rw.controller already exists")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "Returning nil, rw.controller already exists")
 		}
 		return nil
 	}
-	if klog.V(2) {
-		klog.Infof("new startWatch GVR: %v  kind: %s\n", rw.GroupVersionResource, rw.kind)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("new startWatch GVR: %v  kind: %s\n", rw.GroupVersionResource, rw.kind))
 	}
 
 	// Set up call back functions to queue resource change events
@@ -1013,16 +1028,18 @@ func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionReso
 		}, cache.Indexers{})
 
 	rw.stopCh = make(chan struct{})
-
-	if klog.V(2) {
-		klog.Infof("startWatch starting cache.controller.Run() thread%v", rw.controller)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Starting cache.controller.Run() thread%v", rw.controller))
 	}
+
 	go rw.controller.Run(rw.stopCh)
 
 	// Wait for all involved caches to be synced, before processing items from the queue is started
 	if !cache.WaitForCacheSync(rw.stopCh, rw.controller.HasSynced) {
 		err := fmt.Errorf("startWatch timed out waiting for caches to sync for GVR %s", gvr)
-		klog.Error(err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Timed out waiting for caches to sync for GVR %s", gvr))
+		}
 		return err
 	}
 
@@ -1030,18 +1047,17 @@ func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionReso
 	var theResController = resController
 	var theRW = rw
 	go func() {
-		if klog.V(3) {
-			klog.Infof("wstartWatch orker thread started for GVR: %s  input GVR: %v", theRW.GroupVersionResource, gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Worker thread started for GVR: %s  input GVR: %v", theRW.GroupVersionResource, gvr))
 		}
 		for processNextItem(theResController, theRW) {
 		}
-		if klog.V(3) {
-			klog.Infof("startWatch worker thread stopped for GVR: %s  input GVR: %v", theRW.GroupVersionResource, gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Worker thread stopped for GVR: %s  input GVR: %v", theRW.GroupVersionResource, gvr))
 		}
 	}()
-
-	if klog.V(4) {
-		klog.Infof("    startWatch completed for GVR: %s\n", gvr)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("    completed for GVR: %s\n", gvr))
 	}
 	return nil
 }
@@ -1049,8 +1065,8 @@ func (resController *ClusterWatcher) startWatch(inputGVR schema.GroupVersionReso
 // Stop watch if it's already being watched
 // Start watch if it should be watched
 func (resController *ClusterWatcher) restartWatch(gvr schema.GroupVersionResource) error {
-	if klog.V(4) {
-		klog.Infof("restartWatch %v\n", gvr)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%v\n", gvr))
 	}
 	resController.stopWatch(gvr)
 	return resController.startWatch(gvr)
@@ -1059,9 +1075,8 @@ func (resController *ClusterWatcher) restartWatch(gvr schema.GroupVersionResourc
 // stop watch if it's already being watched
 // otherwise, noop
 func (resController *ClusterWatcher) stopWatch(gvr schema.GroupVersionResource) {
-
-	if klog.V(4) {
-		klog.Infof("stopWatch %s\n", gvr)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s\n", gvr))
 	}
 	resController.mutex.Lock()
 	defer resController.mutex.Unlock()
@@ -1072,8 +1087,8 @@ func (resController *ClusterWatcher) stopWatch(gvr schema.GroupVersionResource) 
 			close(rw.stopCh)
 			rw.queue.ShutDown()
 			rw.controller = nil
-			if klog.V(2) {
-				klog.Infof("stopped watching %s", gvr)
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("stopped watching %s", gvr))
 			}
 		}
 	}
@@ -1161,9 +1176,8 @@ func isSameResource(res1 *resourceInfo, res2 *resourceInfo) bool {
 func setkAppNavStatus(unstructuredObj *unstructured.Unstructured, stat string, flyoverText string, flyoverNLS string) {
 	var objMap = unstructuredObj.Object
 	var metadata = objMap[METADATA].(map[string]interface{})
-
-	if klog.V(4) {
-		klog.Infof("setkAppNavStatus resource: %s status: %s flyover:%s\n", unstructuredObj.GetName(), stat, flyoverText)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("resource: %s status: %s flyover:%s\n", unstructuredObj.GetName(), stat, flyoverText))
 	}
 
 	annotationsInterf, ok := metadata[ANNOTATIONS]
@@ -1185,14 +1199,15 @@ func (resController *ClusterWatcher) parseResource(unstructuredObj *unstructured
 	parseResourceBasic(unstructuredObj, resourceInfo)
 	apiVersionKind := resourceInfo.apiVersion + "/" + resourceInfo.kind
 	gvr, ok := resController.apiVersionKindToGVR.Load(apiVersionKind)
+
 	if ok {
-		if klog.V(4) {
-			klog.Infof("parseResource got gvr: %s mapped to apiVersion/Kind: %s", gvr.(schema.GroupVersionResource), apiVersionKind)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Got gvr: %s mapped to apiVersion/Kind: %s", gvr.(schema.GroupVersionResource), apiVersionKind))
 		}
 		resourceInfo.gvr = gvr.(schema.GroupVersionResource)
 	} else {
-		if klog.V(4) {
-			klog.Infof("parseResource no GVR is mapped to apiVersion/Kind: %s", apiVersionKind)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("No GVR is mapped to apiVersion/Kind: %s", apiVersionKind))
 		}
 	}
 }
@@ -1202,8 +1217,8 @@ func parseResourceBasic(unstructuredObj *unstructured.Unstructured, resourceInfo
 	resourceInfo.unstructuredObj = unstructuredObj
 	var objMap = unstructuredObj.Object
 	resourceInfo.apiVersion = objMap[APIVERSION].(string)
-	if klog.V(4) {
-		klog.Infof("parseResourceBasic apiVersion: %s", resourceInfo.apiVersion)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("apiVersion: %s", resourceInfo.apiVersion))
 	}
 	resourceInfo.kind = objMap[KIND].(string)
 
@@ -1259,8 +1274,8 @@ func parseResourceBasic(unstructuredObj *unstructured.Unstructured, resourceInfo
 
 // parseAppResource parses Application resource into more convenient representation
 func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructured.Unstructured, appResource *appResourceInfo) error {
-	if klog.V(4) {
-		klog.Infof("parseAppResource entry resource :%s %v", unstructuredObj.GetName(), unstructuredObj)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("resource :%s %v", unstructuredObj.GetName(), unstructuredObj))
 	}
 	resController.parseResource(unstructuredObj, &appResource.resourceInfo)
 
@@ -1290,38 +1305,42 @@ func (resController *ClusterWatcher) parseAppResource(unstructuredObj *unstructu
 		return fmt.Errorf("object has no spec %s", unstructuredObj)
 	}
 	spec = tmp.(map[string]interface{})
+
 	appResource.componentKinds = make([]groupKind, 0)
 	tmp, ok = spec[COMPONENTKINDS]
 	if ok {
 		componentKinds := tmp.([]interface{})
 		for _, component := range componentKinds {
 			var kindMap = component.(map[string]interface{})
-			if klog.V(4) {
-				klog.Infof("parseAppResource application: %s kindMap: %v", appResource.name, kindMap)
+
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("application: %s kindMap: %v", appResource.name, kindMap))
 			}
 			group, _ := kindMap[GROUP].(string)
 			kind, ok2 := kindMap[KIND].(string)
 			if ok2 {
-				if klog.V(4) {
-					klog.Infof("parseAppResource application: %s processing componentKind: group: %s  kind: %s", appResource.name, group, kind)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("application: %s processing componentKind: group: %s  kind: %s", appResource.name, group, kind))
 				}
 				gvrs, group1, ok3 := resController.getGVRsForGroupKind(group, kind)
 				if ok3 {
-					if group1 != group && klog.V(2) {
-						klog.Infof("parseAppResource substituting componentKind group %s for %s", group1, group)
+					if group1 != group {
+						if logger.IsEnabled(LogTypeInfo) {
+							logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Substituting componentKind group %s for %s", group1, group))
+						}
 					}
 					var groupKind = groupKind{
 						group:  group1,
 						kind:   kind,
 						gvrSet: gvrs,
 					}
-					if klog.V(4) {
-						klog.Infof("parseAppResource application: %s groupKind: %v", appResource.name, groupKind)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("application: %s groupKind: %v", appResource.name, groupKind))
 					}
 					appResource.componentKinds = append(appResource.componentKinds, groupKind)
 				} else {
-					if klog.V(4) {
-						klog.Infof("parseAppResource skipping componentKind for application: %s error getting GVR for componentKind: group: %s kind: %s", appResource.name, group, kind)
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Skipping componentKind for application: %s error getting GVR for componentKind: group: %s kind: %s", appResource.name, group, kind))
 					}
 				}
 			}
@@ -1396,16 +1415,16 @@ func getCRDGVRKindSubresource(unstructuredObj *unstructured.Unstructured) (group
 		}
 	}
 	subResource = ""
-	if klog.V(4) {
-		klog.Infof("getCRDGVRKindSubresource returning group: %s version: %s plural: %s kind: %s namespaced %t", group, version, plural, kind, namespaced)
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Returning group: %s version: %s plural: %s kind: %s namespaced %t", group, version, plural, kind, namespaced))
 	}
 	return
 }
 
 // Add/modify a GVR of resource to be watched
 func (resController *ClusterWatcher) addGVR(obj interface{}) (gvr schema.GroupVersionResource) {
-	if klog.V(4) {
-		klog.Infof("addGVR entry")
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, "addGVR")
 	}
 	switch obj.(type) {
 	case *unstructured.Unstructured:
@@ -1416,12 +1435,14 @@ func (resController *ClusterWatcher) addGVR(obj interface{}) (gvr schema.GroupVe
 			resController.addResourceMapEntry(kind, group, version, plural, namespaced)
 		}
 		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: plural}
-		if klog.V(4) {
-			klog.Infof("addGVR returning GVR: %s", gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Returning GVR: %s", gvr))
 		}
 		return gvr
 	default:
-		klog.Errorf("addGVR not Unstructured: type: %T val: %s\n", obj, obj)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Not Unstructured: type: %T val: %s\n", obj, obj))
+		}
 		return schema.GroupVersionResource{}
 	}
 }
@@ -1454,7 +1475,9 @@ func (resController *ClusterWatcher) deleteGVR(obj interface{}) (gvr schema.Grou
 		resController.deleteResourceMapEntry(schema.GroupVersionResource{Group: group, Version: version, Resource: plural}, kind)
 		return gvr
 	default:
-		klog.Errorf("object not Unstructured: type: %T val: %s\n", obj, obj)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("object not Unstructured: type: %T val: %s\n", obj, obj))
+		}
 		return schema.GroupVersionResource{}
 	}
 }

@@ -19,15 +19,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"strconv"
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
 )
 
 // Check whether a resource exists
@@ -147,35 +147,35 @@ func waitForkAppNavAutoDelete(ctx context.Context, cancel context.CancelFunc, te
 func sameAutoCreatedApplication(actual *appResourceInfo, expected *appResourceInfo) bool {
 	ret := true
 	if !sameLabels(actual.labels, expected.labels) {
-		if klog.V(2) {
-			klog.Info("sameAutoCreatedApplication labels different")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication labels different")
 		}
 		ret = false
 	}
 
 	if actual.annotations[AppAutoCreatedFromName] != expected.annotations[AppAutoCreatedFromName] {
-		if klog.V(2) {
-			klog.Info("sameAutoCreatedApplication kappnav.app.auto-created.from.name different")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication kappnav.app.auto-created.from.name different")
 		}
 		ret = false
 	}
 
 	if !sameComponentKinds(actual.componentKinds, expected.componentKinds) {
-		if klog.V(2) {
-			klog.Info("sameAutoCreatedApplication componentKinds different")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication componentKinds different")
 		}
 		ret = false
 	}
 
 	if !sameLabels(actual.matchLabels, expected.matchLabels) {
-		if klog.V(2) {
-			klog.Info("sameAutoCreatedApplication matchLabels different")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication matchLabels different")
 		}
 		ret = false
 	}
 	if !sameMatchExpressions(actual.matchExpressions, expected.matchExpressions) {
-		if klog.V(2) {
-			klog.Info("sameAutoCreatedApplication matchExpressions different")
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication matchExpressions different")
 		}
 		ret = false
 	}
@@ -202,8 +202,8 @@ func waitForkAppNavAutoCreateModify(ctx context.Context, cancel context.CancelFu
 
 			ok := sameAutoCreatedApplication(actualAutoCreated, expectedAutoCreated)
 			if ok {
-				if klog.V(5) {
-					klog.Infof("auto-created resource has expected content: test %s, iteration %d,  %s %s %s. expected Object: %s, actual object: %s", testName, iteration, resInfo.kind, resInfo.namespace, resInfo.name, resInfo.resInfo.unstructuredObj, createdObj)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("auto-created resource has expected content: test %s, iteration %d,  %s %s %s. expected Object: %s, actual object: %s", testName, iteration, resInfo.kind, resInfo.namespace, resInfo.name, resInfo.resInfo.unstructuredObj, createdObj))
 				}
 				return nil
 			}
@@ -244,8 +244,8 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 		if resInfo.fileChanged {
 			// fetch from file
 			unstructuredObj, err = readJSON(resInfo.fileName)
-			if klog.V(4) {
-				klog.Infof("reading modified JSON from file %s, error: %s", resInfo.fileName, err)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("reading modified JSON from file %s, error: %s", resInfo.fileName, err))
 			}
 			if err != nil {
 				return err
@@ -253,8 +253,8 @@ func modifyResource(resController *ClusterWatcher, resInfo resourceID) error {
 		} else {
 			// fetch the current resource
 			unstructuredObj, err = intf.Get(resInfo.name, metav1.GetOptions{})
-			if klog.V(4) {
-				klog.Infof("reading resource %s from Kube, error: %s", resInfo.name, err)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("reading resource %s from Kube, error: %s", resInfo.name, err))
 			}
 			if err != nil {
 				return err
@@ -344,8 +344,8 @@ func findResourceDelta(previous map[string]resourceID, current map[string]resour
 /* Wait for status to change. Return true if expected status is reached
    or false if not reached within timeout */
 func waitForStatusChange(testName string, iteration int, resController *ClusterWatcher, resource resourceID, expectedStatus string) error {
-	if klog.V(4) {
-		klog.Infof("waitForStatusChange test: %s, iteration %d, resource: %s %s %s, expecting: %s\n", testName, iteration, resource.kind, resource.namespace, resource.name, expectedStatus)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("waitForStatusChange test: %s, iteration %d, resource: %s %s %s, expecting: %s\n", testName, iteration, resource.kind, resource.namespace, resource.name, expectedStatus))
 	}
 	timeout := BatchDuration * 5
 	if timeout < time.Second {
@@ -354,19 +354,20 @@ func waitForStatusChange(testName string, iteration int, resController *ClusterW
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	err := waitForkAppNavStatusChange(ctx, cancel, testName, iteration, resController, resource, expectedStatus)
 	if err != nil {
-		if klog.V(4) {
-			klog.Error(err)
+		if logger.IsEnabled(LogTypeError) {
+			str := fmt.Sprintf("%s", err)
+			logger.Log(CallerName(), LogTypeError, str)
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("waitForStatusChange done\n")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "waitForStatusChange done\n")
 	}
 	return err
 }
 
 func waitForAutoDelete(testName string, iteration int, resController *ClusterWatcher, resource resourceID) error {
-	if klog.V(4) {
-		klog.Infof("waitForAutoDelete test: %s, iteration %d, resource: %s %s %s\n", testName, iteration, resource.kind, resource.namespace, resource.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("waitForAutoDelete test: %s, iteration %d, resource: %s %s %s\n", testName, iteration, resource.kind, resource.namespace, resource.name))
 	}
 	timeout := BatchDuration * 5
 	if timeout < time.Second {
@@ -375,19 +376,20 @@ func waitForAutoDelete(testName string, iteration int, resController *ClusterWat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	err := waitForkAppNavAutoDelete(ctx, cancel, testName, iteration, resController, resource)
 	if err != nil {
-		if klog.V(4) {
-			klog.Error(err)
+		if logger.IsEnabled(LogTypeError) {
+			str := fmt.Sprintf("%s", err)
+			logger.Log(CallerName(), LogTypeError, str)
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("waitForAutoDelete done")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "waitForAutoDelete done")
 	}
 	return err
 }
 
 func waitForAutoCreateModify(testName string, iteration int, resController *ClusterWatcher, resource resourceID) error {
-	if klog.V(4) {
-		klog.Infof("waitForAutoCreateModify test: %s, iteration %d, resource: %s %s %s\n", testName, iteration, resource.kind, resource.namespace, resource.name)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("waitForAutoCreateModify test: %s, iteration %d, resource: %s %s %s\n", testName, iteration, resource.kind, resource.namespace, resource.name))
 	}
 	timeout := BatchDuration * 5
 	if timeout < time.Second {
@@ -396,12 +398,13 @@ func waitForAutoCreateModify(testName string, iteration int, resController *Clus
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	err := waitForkAppNavAutoCreateModify(ctx, cancel, testName, iteration, resController, resource)
 	if err != nil {
-		if klog.V(4) {
-			klog.Error(err)
+		if logger.IsEnabled(LogTypeError) {
+			str := fmt.Sprintf("%s", err)
+			logger.Log(CallerName(), LogTypeError, str)
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("waitForAutoCreateModify done")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "waitForAutoCreatedModify done")
 	}
 	return err
 }
@@ -502,8 +505,9 @@ func transitionHelper(ta *testActions) error {
 
 	// Calculate list of resource to add, delete, or modify
 	toAdd, toDelete, toModify := findResourceDelta(previousResources, ta.resources[ta.currentIteration])
-	if klog.V(2) {
-		klog.Infof("test %s iteration [%d] toAdd: %d, toDelete: %d, toModify: %d\n", ta.testName, ta.currentIteration, len(toAdd), len(toDelete), len(toModify))
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s iteration [%d] toAdd: %d, toDelete: %d, toModify: %d\n", ta.testName, ta.currentIteration, len(toAdd), len(toDelete), len(toModify)))
 	}
 
 	// create new resources
@@ -520,8 +524,9 @@ func transitionHelper(ta *testActions) error {
 	if err != nil {
 		return err
 	}
-	if klog.V(2) {
-		klog.Infof("test %s  populated resources\n", ta.testName)
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  populated resources\n", ta.testName))
 	}
 
 	// delete resources
@@ -532,8 +537,8 @@ func transitionHelper(ta *testActions) error {
 		resInfo.namespace = resToDelete.namespace
 		resInfo.name = resToDelete.name
 
-		if klog.V(2) {
-			klog.Infof("test %s  deleting %s\n", ta.testName, resInfo.name)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  deleting %s\n", ta.testName, resInfo.name))
 		}
 
 		err := deleteResource(ta.clusterWatcher, resInfo)
@@ -541,15 +546,15 @@ func transitionHelper(ta *testActions) error {
 			return err
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("test %s  completed deletion\n", ta.testName)
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  completed deletion\n", ta.testName))
 	}
 
 	// modify resources
 	for _, resToModify := range toModify {
-
-		if klog.V(2) {
-			klog.Infof("test %s  modifying %s\n", ta.testName, resToModify.name)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  modifying %s\n", ta.testName, resToModify.name))
 		}
 
 		err := modifyResource(ta.clusterWatcher, resToModify)
@@ -557,16 +562,18 @@ func transitionHelper(ta *testActions) error {
 			return err
 		}
 	}
-	if klog.V(2) {
-		klog.Infof("test %s  completed modification\n", ta.testName)
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  completed modification\n", ta.testName))
 	}
 
 	// check resource status
 	for _, res := range ta.resources[ta.currentIteration] {
 		if ta.kindsToCheckStatus[res.kind] {
 			if res.expectedStatus == NoStatus {
-				if klog.V(2) {
-					klog.Infof("    checking NoStatus for resource %s %s %s", res.kind, res.namespace, res.name)
+
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    checking NoStatus for resource %s %s %s", res.kind, res.namespace, res.name))
 				}
 				/* It is difficult to check that status is not being set. The best we can do is to wait a while */
 				time.Sleep(BatchDuration * 2)
@@ -580,8 +587,9 @@ func transitionHelper(ta *testActions) error {
 					err = fmt.Errorf("    resource %s %s %s has unexpected status. Expecting no status, but has %s", res.kind, res.namespace, res.name, stat)
 					return err
 				}
-				if klog.V(2) {
-					klog.Infof("    resource %s %s %s has expected no status\n", res.kind, res.namespace, res.name)
+
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    resource %s %s %s has expected no status\n", res.kind, res.namespace, res.name))
 				}
 			} else {
 				// check status for this resource
@@ -589,8 +597,9 @@ func transitionHelper(ta *testActions) error {
 				if err != nil {
 					return err
 				}
-				if klog.V(2) {
-					klog.Infof("    resource %s %s %s has expected status %s\n", res.kind, res.namespace, res.name, res.expectedStatus)
+
+				if logger.IsEnabled(LogTypeInfo) {
+					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    resource %s %s %s has expected status %s\n", res.kind, res.namespace, res.name, res.expectedStatus))
 				}
 			}
 		}
@@ -605,8 +614,9 @@ func transitionHelper(ta *testActions) error {
 		previousSystemResources = ta.autoCreatedResources[ta.currentIteration-1]
 	}
 	toAutoCreate, toAutoDelete, toAutoModify := findResourceDelta(previousSystemResources, ta.autoCreatedResources[ta.currentIteration])
-	if klog.V(2) {
-		klog.Infof("test %s iteration system resources: [%d] toAdd: %d, toDelete: %d, toModify: %d\n", ta.testName, ta.currentIteration, len(toAdd), len(toDelete), len(toModify))
+
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s iteration system resources: [%d] toAdd: %d, toDelete: %d, toModify: %d\n", ta.testName, ta.currentIteration, len(toAdd), len(toDelete), len(toModify)))
 	}
 
 	// wait for auto-deleted resources to be gone
@@ -641,8 +651,9 @@ func transitionHelper(ta *testActions) error {
 			if err != nil {
 				return err
 			}
-			if klog.V(2) {
-				klog.Infof("    resource %s %s %s has expected status %s\n", res.kind, res.namespace, res.name, res.expectedStatus)
+
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("    resource %s %s %s has expected status %s\n", res.kind, res.namespace, res.name, res.expectedStatus))
 			}
 		}
 	}
@@ -665,7 +676,9 @@ func (ta *testActions) transitionAll() error {
    to return the exepcted status of a resource
 */
 func (ta *testActions) getStatus(kind string, namespace string, name string) (status string, flyover string, flyoverNLS string, err error) {
-	// klog.Infof("getStatus %s %s %s %s %d %d\n", ta.testName, kind, namespace, name, ta.currentIteration, ta.totalIterations)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%s %s %s %s %d %d\n", ta.testName, kind, namespace, name, ta.currentIteration, ta.totalIterations))
+	}
 	if ta.totalIterations == 0 {
 		// for tests that don't have iteration data
 		return "", "", "", fmt.Errorf("total iterations == 0")
@@ -678,8 +691,8 @@ func (ta *testActions) getStatus(kind string, namespace string, name string) (st
 	}
 	key := componentKey(kind, namespace, name)
 	if res, ok := ta.resources[iteration][key]; ok {
-		if klog.V(2) {
-			klog.Infof("testActions.getStatus: %d %s, %s, %s, %s\n", ta.currentIteration, kind, namespace, name, res.expectedStatus)
+		if logger.IsEnabled(LogTypeInfo) {
+			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("%d %s, %s, %s, %s\n", ta.currentIteration, kind, namespace, name, res.expectedStatus))
 		}
 		return res.expectedStatus, res.flyover, res.flyoverNLS, nil
 	}

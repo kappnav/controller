@@ -17,51 +17,63 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/klog"
+	"fmt"
 )
 
 // CRDNewHandler processes changes to Custom Resource Definitions
 var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
-	if klog.V(2) {
-		klog.Infof("CRDNewHandler entry eventData.funcType: %v resourceWatcher: %v", eventData.funcType, rw)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("eventData.funcType: %v resourceWatcher: %v", eventData.funcType, rw))
 	}
 	key := eventData.key
 	obj, exists, err := rw.store.GetByKey(key)
 	if err != nil {
-		klog.Errorf("CRDNewHandler fetching key %s failed: %v", key, err)
+		if logger.IsEnabled(LogTypeError) {
+			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Fetching key %s failed: %v", key, err))
+		}
 		return err
 	}
 	if !exists {
 		// a CRD has been deleted
-
-		if klog.V(4) {
-			klog.Infof("CRDNewHandler a CRD has been deleted")
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, "A CRD has been deleted")
 		}
 		resController.deleteGVR(eventData.obj)
 	} else {
 		// add or modify GVR
 		gvr := resController.addGVR(obj)
-		if klog.V(4) {
-			klog.Infof("CRDNewHandler added GVR %s", gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Added GVR %s", gvr))
 		}
-		if eventData.funcType == AddFunc {
-			if gvr == coreApplicationGVR {
-				if klog.V(4) {
-					klog.Infof("CRDNewHandler Application CRD add event")
+		// add watcher when CRD is added or modified
+		if eventData.funcType == AddFunc || eventData.funcType == UpdateFunc {
+
+			if gvr == coreKappNavGVR {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, "KAppNav CRD add or update event")
 				}
-				// TODO: need something less hard coded to trigger start watch of deployment when aplication CRD is defind
+				resController.AddToWatch(coreKappNavGVR)
+			}
+
+			if gvr == coreApplicationGVR {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, "Application CRD add or update event")
+				}
+				// TODO: need something less hard coded to trigger start watch of deployment when aplication CRD is defined
 				resController.AddToWatch(coreApplicationGVR)
 				resController.AddToWatch(coreDeploymentGVR)
 				resController.AddToWatch(coreStatefulSetGVR)
 				err = deleteOrphanedAutoCreatedApplications(resController)
 				if err != nil {
-					klog.Errorf("Error deleting orphaned applications: %s", err)
+					if logger.IsEnabled(LogTypeError) {
+						logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error deleting orphaned applications: %s", err))
+					}
 				}
 			}
 		}
 	}
-	if klog.V(4) {
-		klog.Infof("CRDNewHandler exit success")
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, "success")
 	}
 	return nil
 }

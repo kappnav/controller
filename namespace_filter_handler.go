@@ -17,12 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"fmt"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
 )
 
 func newNamespaceFilter() *namespaceFilter {
@@ -43,8 +44,8 @@ type namespaceFilter struct {
 func (nsFilter *namespaceFilter) permitAllNamespacesForGVR(gvr schema.GroupVersionResource) {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
-	if klog.V(3) {
-		klog.Infof("permitAllNamesapceForGVR called for GVR %s", gvr)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("permitAllNamesapceForGVR called for GVR %s", gvr))
 	}
 	nsFilter.permitAllNamespaces[gvr] = gvr
 }
@@ -86,31 +87,30 @@ func (nsFilter *namespaceFilter) addNamespaceForGVR(gvr schema.GroupVersionResou
    namespace: namespace to add for processing the given GVR
 */
 func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, gvr schema.GroupVersionResource, namespace string) {
-
-	if klog.V(3) {
-		klog.Infof("permitNamespace GVR: %s, namespace: %s", gvr, namespace)
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("GVR: %s, namespace: %s", gvr, namespace))
 	}
 
 	if !resController.isNamespacePermitted(namespace) {
 		// namespace is not in allowed in this kappnav instance
-		if klog.V(3) {
-			klog.Infof("permitNamespace namespace %s not permitted in this kappnav instance", namespace)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("namespace %s not permitted in this kappnav instance", namespace))
 		}
 		return
 	}
 
 	if !resController.isNamespaced(gvr) {
 		// resource is not namespaced
-		if klog.V(3) {
-			klog.Infof("permitNamespaces GVR %s not namespaced", gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("GVR %s not namespaced", gvr))
 		}
 		return
 	}
 
 	if nsFilter.isAllNamespacesPermitted(gvr) {
 		// already permitted for all namespaces
-		if klog.V(3) {
-			klog.Infof("permitNamespaces GVR %s permited for all namespaces", gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("GVR %s permited for all namespaces", gvr))
 		}
 		return
 	}
@@ -119,8 +119,8 @@ func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, 
 		/* first time adding this namespace. Replay cached objects of this gvr matching this namespace */
 		if gvr == coreApplicationGVR {
 			/* applications already has its own handler for all namespaces */
-			if klog.V(3) {
-				klog.Infof("not replaying applications after adding namespace %s for gvr %s", namespace, gvr)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("not replaying applications after adding namespace %s for gvr %s", namespace, gvr))
 			}
 			return
 		}
@@ -142,13 +142,13 @@ func (nsFilter *namespaceFilter) permitNamespace(resController *ClusterWatcher, 
 							obj:      resource,
 							oldObj:   nil,
 						}
-						if klog.V(3) {
-							klog.Infof("replaying %s after adding namespace %s for GVR %s", key, namespace, gvr)
+						if logger.IsEnabled(LogTypeDebug) {
+							logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("replaying %s after adding namespace %s for GVR %s", key, namespace, gvr))
 						}
 						batchResourceHandler(resController, rw, &data)
 					} else {
-						if klog.V(3) {
-							klog.Infof("not replaying %s after adding namespace %s for GVR %s", key, namespace, gvr)
+						if logger.IsEnabled(LogTypeDebug) {
+							logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("not replaying %s after adding namespace %s for GVR %s", key, namespace, gvr))
 						}
 					}
 				}
@@ -181,22 +181,21 @@ func getNamespace(obj interface{}) (string, bool) {
 func (nsFilter *namespaceFilter) shouldProcess(resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) bool {
 	nsFilter.mutex.Lock()
 	defer nsFilter.mutex.Unlock()
-
-	if klog.V(3) {
-		klog.Infof("shouldProcess key: %s, gvr: %s", eventData.key, eventData.gvr)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("key: %s, gvr: %s", eventData.key, eventData.gvr))
 	}
 
 	// resource is not namespaced
 	if !rw.namespaced {
-		if klog.V(3) {
-			klog.Infof("shouldProcess true, gvr %s not namespaced", eventData.gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("true, gvr %s not namespaced", eventData.gvr))
 		}
 		return true
 	}
 
 	if _, ok := nsFilter.permitAllNamespaces[eventData.gvr]; ok && resController.isAllNamespacesPermitted() {
-		if klog.V(3) {
-			klog.Infof("shouldProcess true, gvr: %s is permited for all namespaces", eventData.gvr)
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("true, gvr: %s is permited for all namespaces", eventData.gvr))
 		}
 		return true
 	}
@@ -207,17 +206,17 @@ func (nsFilter *namespaceFilter) shouldProcess(resController *ClusterWatcher, rw
 		namespace, ok := getNamespace(eventData.obj)
 		if ok {
 			if _, ok := namespaces[namespace]; ok {
-				if klog.V(3) {
-					klog.Infof("shouldProcess true, gvr: %s is permited for namespace %s", eventData.gvr, namespace)
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("true, gvr: %s is permited for namespace %s", eventData.gvr, namespace))
 				}
 				return true
 			}
-			if klog.V(3) {
-				klog.Infof("shouldProcess false gvr: %s is not permited for namespace %s", eventData.gvr, namespace)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("false gvr: %s is not permited for namespace %s", eventData.gvr, namespace))
 			}
 		}
-	} else if klog.V(3) {
-		klog.Infof("shouldProcess false no namespaces defined for gvr: %s ", eventData.gvr)
+	} else if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("false no namespaces defined for gvr: %s ", eventData.gvr))
 	}
 	return false
 }

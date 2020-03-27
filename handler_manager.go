@@ -17,8 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog"
 )
 
 // HandlersForOneGVR contains event handlers for one GVR
@@ -43,6 +44,7 @@ func newHandlerManager() *HandlerManager {
 
 	ret.setPrimaryHandler(coreApplicationGVR, &batchApplicationHandler)
 	ret.setPrimaryHandler(coreCustomResourceDefinitionGVR, &CRDNewHandler)
+	ret.setPrimaryHandler(coreKappNavGVR, &KAppNavHandler)
 	ret.addOtherHandler(coreDeploymentGVR, &autoCreateAppHandler)
 	ret.addOtherHandler(coreStatefulSetGVR, &autoCreateAppHandler)
 	return ret
@@ -78,9 +80,8 @@ func (mgr *HandlerManager) addOtherHandler(gvr schema.GroupVersionResource, hand
 /* Call all the handlers for a GVR
  */
 func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resController *ClusterWatcher, rw *ResourceWatcher, eventData *eventHandlerData) error {
-
-	if klog.V(4) {
-		klog.Infof("callHandlers entry %s %v\n", gvr, eventData)
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("callHandlers entry %s %v\n", gvr, eventData))
 	}
 	handler := mgr.handlers[gvr]
 	// TODO: can this be done better? For now, We just accumulate one error and log the rest
@@ -93,7 +94,9 @@ func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resCont
 				err1 := (*handler.primaryHandler)(resController, rw, eventData)
 				if err1 != nil {
 					err = err1
-					klog.Errorf("Error calling primary handler for gvr %s, error: %s", gvr, err)
+					if logger.IsEnabled(LogTypeError) {
+						logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error calling primary handler for gvr %s, error: %s", gvr, err))
+					}
 				}
 			}
 		} else {
@@ -102,7 +105,9 @@ func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resCont
 			err2 := (*mgr.defaultPrimaryHandler)(resController, rw, eventData)
 			if err2 != nil {
 				err = err2
-				klog.Errorf("Error calling default primary handler for gvr %s, error: %s", gvr, err)
+				if logger.IsEnabled(LogTypeError) {
+					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error calling default primary handler for gvr %s, error: %s", gvr, err))
+				}
 			}
 		}
 		if resController.isEventPermitted(eventData) {
@@ -112,7 +117,9 @@ func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resCont
 				err3 := (*otherHandler)(resController, rw, eventData)
 				if err3 != nil {
 					err = err3
-					klog.Errorf("Error calling other handler for gvr %s, error: %s", gvr, err)
+					if logger.IsEnabled(LogTypeError) {
+						logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error calling other handler for gvr %s, error: %s", gvr, err))
+					}
 				}
 			}
 		}
@@ -123,11 +130,14 @@ func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resCont
 		err4 := (*mgr.defaultPrimaryHandler)(resController, rw, eventData)
 		if err4 != nil {
 			err = err4
-			klog.Errorf("Error calling default primary handler for gvr %s, error: %s", gvr, err)
+			if logger.IsEnabled(LogTypeError) {
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error calling default primary handler for gvr %s, error: %s", gvr, err))
+			}
 		}
 	}
-	if klog.V(4) {
-		klog.Infof("callHandlers exit %v\n", err)
+	if logger.IsEnabled(LogTypeExit) {
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%v\n", err))
+
 	}
 	return err
 }
