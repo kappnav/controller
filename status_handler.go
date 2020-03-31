@@ -170,9 +170,24 @@ func processBatchOfApplicationsAndResources(ts *batchStore, resources *batchReso
 
 	// update kappnav status for all resources whose status have changed
 	for _, res := range toChange {
-		err := sendResourceStatus(ts.resController, res, res.kappnavStatVal, res.flyOver, res.flyOverNLS)
-		if err != nil {
-			return err
+		var apps []*appResourceInfo
+		var autoCreate bool
+		kAppNavMonitoredResource := isKAppNavMonitoredResource(res)
+		if !kAppNavMonitoredResource {
+			_, autoCreate = res.labels[AppAutoCreate]
+			if !autoCreate {
+				apps = getApplicationsForResource(ts.resController, res)
+			}
+		}
+		if kAppNavMonitoredResource || autoCreate || (apps != nil && len(apps) != 0) {
+			err := sendResourceStatus(ts.resController, res, res.kappnavStatVal, res.flyOver, res.flyOverNLS)
+			if err != nil {
+				return err
+			}
+		} else {
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("not updating status for %s %v", res.name, res.gvr))
+			}
 		}
 	}
 	return nil
