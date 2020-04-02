@@ -203,13 +203,16 @@ func setInitLoggingData(dynInterf dynamic.Interface) {
 			loggingMap, _ := spec["logging"]
 			// retrieve logging value of "controller" from logging map
 			if loggingMap != nil {
-				loggingValue := loggingMap.(map[string]interface{})["controller"].(string)
-				if len(loggingValue) > 0 {
-					if logger.IsEnabled(LogTypeInfo) {
-						logger.Log(CallerName(), LogTypeInfo, "Set the log level to "+loggingValue)
+				loggingValue := loggingMap.(map[string]interface{})["controller"]	
+				if loggingValue != nil {
+					loggingValue := loggingValue.(string)
+					if len(loggingValue) > 0 {
+						if logger.IsEnabled(LogTypeInfo) {
+							logger.Log(CallerName(), LogTypeInfo, "Set the log level to "+loggingValue)
+						}
+						//invoke setLoggingLevel to reset log level
+						SetLoggingLevel(loggingValue)
 					}
-					//invoke setLoggingLevel to reset log level
-					SetLoggingLevel(loggingValue)
 				}
 			}
 		}
