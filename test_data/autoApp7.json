@@ -2,19 +2,19 @@
     "apiVersion": "app.k8s.io/v1beta1",
     "kind": "Application",
     "metadata": {      
-        "creationTimestamp": "2019-05-23T17:42:51Z",
+        "creationTimestamp": "2019-05-23T18:00:47Z",
         "generation": 1,
         "labels": {
-            "my-app": "auto6",
-            "app.kubernetes.io/name": "auto6",
-            "app.kubernetes.io/version": "2.1",
+            "app": "auto7-app",
+            "app.kubernetes.io/name": "auto7-app",
+            "app.kubernetes.io/version": "2",
             "kappnav.app.auto-created": "true"
         },
-        "name": "auto6",
+        "name": "auto7-app",
         "namespace": "default",
-        "resourceVersion": "452763",
-        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto1-app",
-        "uid": "30057451-7d82-11e9-8623-00155de36603"
+        "resourceVersion": "454164",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto7",
+        "uid": "b1081ebf-7d84-11e9-8623-00155de36603"
     },
     "spec": {
         "componentKinds": [
@@ -25,7 +25,7 @@
         ],
         "selector": {
             "matchLabels": {
-                "my-app": "auto6"
+                "app": "auto7-app"
             }
         }
     }

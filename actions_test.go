@@ -153,13 +153,6 @@ func sameAutoCreatedApplication(actual *appResourceInfo, expected *appResourceIn
 		ret = false
 	}
 
-	if actual.annotations[AppAutoCreatedFromName] != expected.annotations[AppAutoCreatedFromName] {
-		if logger.IsEnabled(LogTypeInfo) {
-			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication kappnav.app.auto-created.from.name different")
-		}
-		ret = false
-	}
-
 	if !sameComponentKinds(actual.componentKinds, expected.componentKinds) {
 		if logger.IsEnabled(LogTypeInfo) {
 			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication componentKinds different")

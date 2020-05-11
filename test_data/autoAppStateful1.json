@@ -1,11 +1,7 @@
 {
     "apiVersion": "app.k8s.io/v1beta1",
     "kind": "Application",
-    "metadata": {
-        "annotations": {
-            "kappnav.app.auto-created.from.kind": "StatefulSet",
-            "kappnav.app.auto-created.from.name": "autos1"
-        },
+    "metadata": {      
         "creationTimestamp": "2019-05-26T05:32:49Z",
         "generation": 1,
         "labels": {
