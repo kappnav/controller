@@ -151,6 +151,11 @@ var (
 		Version:  "v1",
 		Resource: "deployments",
 	}
+	corePodGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "pods",
+	}
 	coreConfigMapGVR = schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -256,6 +261,7 @@ func init() {
 	coreKindToGVR = make(map[string]schema.GroupVersionResource)
 	coreKindToGVR["Service"] = coreServiceGVR
 	coreKindToGVR["Deployment"] = coreDeploymentGVR
+	coreKindToGVR["Pod"] = corePodGVR
 	coreKindToGVR["Route"] = coreRouteGVR
 	coreKindToGVR["ConfigMap"] = coreConfigMapGVR
 	coreKindToGVR["Secret"] = coreSecretGVR
