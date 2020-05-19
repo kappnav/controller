@@ -34,6 +34,9 @@ const (
 	autocreateDeployment6       = "test_data/autoDeployment6.json"
 	autocreateDeployment6A      = "test_data/autoDeployment6a.json"
 	autocreateDeployment6B      = "test_data/autoDeployment6b.json"
+	autocreateDeployment7       = "test_data/autoDeployment7.json"
+	autocreateDeployment8       = "test_data/autoDeployment8.json"
+	autocreateDeployment9       = "test_data/autoDeployment9.json"
 
 	autocreateAppDefault = "test_data/autoApp0.json"
 	autocreateApp1       = "test_data/autoApp1.json"
@@ -46,9 +49,9 @@ const (
 	autocreateApp6       = "test_data/autoApp6.json"
 	autocreateApp6A      = "test_data/autoApp6a.json"
 	autocreateApp6B      = "test_data/autoApp6b.json"
-
+	autocreateApp7       = "test_data/autoApp7.json"
+	
 	autocreateStatefulset = "test_data/autoStatefulSet1.json"
-
 	autocreateAppStateful1 = "test_data/autoAppStateful1.json"
 )
 
@@ -134,7 +137,7 @@ func TestAutoCreateDefault(t *testing.T) {
 	autoCreateTestHelper(t, testName, kindsToCheckStatus, files, autoCreatedFiles)
 }
 
-/* Test auto create with default values
+/* Test auto create with no default values
  */
 func TestAutoCreateNonDefault1(t *testing.T) {
 	testName := "TestAutoCreateNonDefault1"
@@ -485,4 +488,86 @@ func TestAutoCreateStatefulSet(t *testing.T) {
 	}
 
 	autoCreateTestHelper(t, testName, kindsToCheckStatus, files, autoCreatedFiles)
+}
+
+
+/* Test auto create with multiple deployments
+ */
+ func TestAutoCreateMultipleDeployments(t *testing.T) {
+    testName := "TestAutoCreateMultipleDeployments"
+	beforeTest()
+	
+    // kinds to check for status
+    var kindsToCheckStatus = map[string]bool{
+        APPLICATION:  true,
+        "Deployment": true,
+	}
+	
+	// resources to pre-populate
+	var files = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment7,	
+		autocreateDeployment8,	
+		autocreateDeployment9,	
+	}
+
+	iteration0IDs, err := readResourceIDs(files)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// auto-create app 
+	iteration0AutoCreatedIDs, err := readResourceIDs([]string{autocreateApp7})
+    if err != nil {
+        t.Fatal(err)
+        return
+	}
+
+	/* Iteration 0: auto-create application is created */
+	testActions := newTestActions(testName, kindsToCheckStatus)
+	testActions.addIteration(iteration0IDs, iteration0AutoCreatedIDs)
+
+	// resources to be kept 
+	var files1 = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment9,
+    }
+
+	iteration1IDs, err := readResourceIDs(files1)
+    if err != nil {
+        t.Fatal(err)
+        return
+    }
+
+	/* Iteration 1: delete deployments auto7 and auto8 */
+	var emptyIDs = []resourceID{}
+	iteration0IDs[2].expectedStatus = NoStatus
+	testActions.addIteration(iteration1IDs, emptyIDs)
+
+	// verify if auto-create app still exists after 2 deployments are deleted
+	testActions.addIteration(iteration1IDs, iteration0AutoCreatedIDs)
+
+	clusterWatcher, err := createClusterWatcher(iteration0IDs, testActions, StatusFailureRate)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer clusterWatcher.shutDown()
+
+    err = testActions.transitionAll()
+    if err != nil {
+		// wait for auto7 to be deleted
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// wait for auto8 to be deleted
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+    }
 }

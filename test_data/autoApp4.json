@@ -1,11 +1,7 @@
 {
     "apiVersion": "app.k8s.io/v1beta1",
     "kind": "Application",
-    "metadata": {
-        "annotations": {
-            "kappnav.app.auto-created.from.kind": "Deployment",
-            "kappnav.app.auto-created.from.name": "auto0"
-        },
+    "metadata": {     
         "creationTimestamp": "2019-05-23T17:38:03Z",
         "generation": 1,
         "labels": {
