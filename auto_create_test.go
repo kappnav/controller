@@ -37,6 +37,15 @@ const (
 	autocreateDeployment7       = "test_data/autoDeployment7.json"
 	autocreateDeployment8       = "test_data/autoDeployment8.json"
 	autocreateDeployment9       = "test_data/autoDeployment9.json"
+	autocreateDeployment7p      = "test_data/autoDeployment7p.json"
+	autocreateDeployment8p      = "test_data/autoDeployment8p.json"
+	autocreateDeployment9p      = "test_data/autoDeployment9p.json"
+	autocreateDeployment7b      = "test_data/autoDeployment7b.json"
+	autocreateDeployment8b      = "test_data/autoDeployment8b.json"
+	autocreateDeployment9b      = "test_data/autoDeployment9b.json"
+	autocreateDeployment7bd     = "test_data/autoDeployment7bd.json"
+	autocreateDeployment8bd     = "test_data/autoDeployment8bd.json"
+	autocreateDeployment9bd     = "test_data/autoDeployment9bd.json"
 
 	autocreateAppDefault = "test_data/autoApp0.json"
 	autocreateApp1       = "test_data/autoApp1.json"
@@ -50,6 +59,9 @@ const (
 	autocreateApp6A      = "test_data/autoApp6a.json"
 	autocreateApp6B      = "test_data/autoApp6b.json"
 	autocreateApp7       = "test_data/autoApp7.json"
+	autocreateApp7p      = "test_data/autoApp7p.json"
+	autocreateApp7b      = "test_data/autoApp7b.json"
+	autocreateApp7bd     = "test_data/autoApp7bd.json"
 	
 	autocreateStatefulset = "test_data/autoStatefulSet1.json"
 	autocreateAppStateful1 = "test_data/autoAppStateful1.json"
@@ -490,8 +502,7 @@ func TestAutoCreateStatefulSet(t *testing.T) {
 	autoCreateTestHelper(t, testName, kindsToCheckStatus, files, autoCreatedFiles)
 }
 
-
-/* Test auto create with multiple deployments
+/* Test auto create when multiple deployments contain autoCreateName associate to same app
  */
  func TestAutoCreateMultipleDeployments(t *testing.T) {
     testName := "TestAutoCreateMultipleDeployments"
@@ -571,3 +582,250 @@ func TestAutoCreateStatefulSet(t *testing.T) {
 		}
     }
 }
+
+/* Test auto create when multiple deployments contain part-of label assoicate to same app
+ */
+ func TestAutoCreatePartOfLabelMultipleDeployments(t *testing.T) {
+    testName := "TestAutoCreatePartOfLabelMultipleDeployments"
+	beforeTest()
+	
+    // kinds to check for status
+    var kindsToCheckStatus = map[string]bool{
+        APPLICATION:  true,
+        "Deployment": true,
+	}
+	
+	// resources to pre-populate
+	var files = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment7p,	
+		autocreateDeployment8p,	
+		autocreateDeployment9p,	
+	}
+
+	iteration0IDs, err := readResourceIDs(files)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// auto-create app 
+	iteration0AutoCreatedIDs, err := readResourceIDs([]string{autocreateApp7p})
+    if err != nil {
+        t.Fatal(err)
+        return
+	}
+
+	/* Iteration 0: auto-create auto7p-app application is created */
+	testActions := newTestActions(testName, kindsToCheckStatus)
+	testActions.addIteration(iteration0IDs, iteration0AutoCreatedIDs)
+
+	// resources to be kept 
+	var files1 = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment9p,
+    }
+
+	iteration1IDs, err := readResourceIDs(files1)
+    if err != nil {
+        t.Fatal(err)
+        return
+    }
+
+	/* Iteration 1: delete deployments auto7p and auto8p */
+	var emptyIDs = []resourceID{}
+	iteration0IDs[2].expectedStatus = NoStatus
+	testActions.addIteration(iteration1IDs, emptyIDs)
+
+	// verify if auto-create app still exists after 2 deployments are deleted
+	testActions.addIteration(iteration1IDs, iteration0AutoCreatedIDs)
+
+	clusterWatcher, err := createClusterWatcher(iteration0IDs, testActions, StatusFailureRate)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer clusterWatcher.shutDown()
+
+	err = testActions.transitionAll()
+	
+    if err != nil {
+		// wait for auto7p to be deleted		
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// wait for auto8p to be deleted
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+    }
+}
+
+/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to same app
+ */
+ func TestAutoCreatePartOfLabelAndAutoCreateNameMultipleDeployments(t *testing.T) {
+    testName := "TestAutoCreatePartOfLabelAndAutoCreateNameMultipleDeployments"
+	beforeTest()
+	
+    // kinds to check for status
+    var kindsToCheckStatus = map[string]bool{
+        APPLICATION:  true,
+        "Deployment": true,
+	}
+	
+	// resources to pre-populate
+	var files = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment7b,	
+		autocreateDeployment8b,	
+		autocreateDeployment9b,	
+	}
+
+	iteration0IDs, err := readResourceIDs(files)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// auto-create app 
+	iteration0AutoCreatedIDs, err := readResourceIDs([]string{autocreateApp7b})
+    if err != nil {
+        t.Fatal(err)
+        return
+	}
+
+	/* Iteration 0: auto-create auto7b-app application is created */
+	testActions := newTestActions(testName, kindsToCheckStatus)
+	testActions.addIteration(iteration0IDs, iteration0AutoCreatedIDs)
+
+	// resources to be kept 
+	var files1 = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment9b,
+    }
+
+	iteration1IDs, err := readResourceIDs(files1)
+    if err != nil {
+        t.Fatal(err)
+        return
+    }
+
+	/* Iteration 1: delete deployments auto7b and auto8b */
+	var emptyIDs = []resourceID{}
+	iteration0IDs[2].expectedStatus = NoStatus
+	testActions.addIteration(iteration1IDs, emptyIDs)
+
+	// verify if auto-create app still exists after 2 deployments are deleted
+	testActions.addIteration(iteration1IDs, iteration0AutoCreatedIDs)
+
+	clusterWatcher, err := createClusterWatcher(iteration0IDs, testActions, StatusFailureRate)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer clusterWatcher.shutDown()
+
+	err = testActions.transitionAll()
+	
+    if err != nil {
+		// wait for auto7b to be deleted		
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// wait for auto8b to be deleted
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+    }
+}
+
+/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to different apps
+ */
+ func TestAutoCreatePartOfLabelAndAutoCreateNameWithDiffApps(t *testing.T) {
+    testName := "TestAutoCreatePartOfAutoCreateNameWithDiffAppsMultipleDeployments"
+	beforeTest()
+	
+    // kinds to check for status
+    var kindsToCheckStatus = map[string]bool{
+        APPLICATION:  true,
+        "Deployment": true,
+	}
+	
+	// resources to pre-populate
+	var files = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment7bd,	
+		autocreateDeployment8bd,	
+		autocreateDeployment9bd,	
+	}
+
+	iteration0IDs, err := readResourceIDs(files)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// auto-create app 
+	iteration0AutoCreatedIDs, err := readResourceIDs([]string{autocreateApp7bd})
+    if err != nil {
+        t.Fatal(err)
+        return
+	}
+
+	/* Iteration 0: auto-create auto7bd-app and auto7bdf-app applications are created */
+	testActions := newTestActions(testName, kindsToCheckStatus)
+	testActions.addIteration(iteration0IDs, iteration0AutoCreatedIDs)
+
+	// resources to be kept 
+	var files1 = []string{
+		CrdApplication,
+		KappnavConfigFile,
+		autocreateDeployment9bd,
+    }
+
+	iteration1IDs, err := readResourceIDs(files1)
+    if err != nil {
+        t.Fatal(err)
+        return
+    }
+
+	/* Iteration 1: delete deployments auto7bd and auto8bd */
+	var emptyIDs = []resourceID{}
+	iteration0IDs[2].expectedStatus = NoStatus
+	testActions.addIteration(iteration1IDs, emptyIDs)
+
+	// verify if auto-create auto7bd-app app still exists after 2 deployments are deleted
+	testActions.addIteration(iteration1IDs, iteration0AutoCreatedIDs)
+
+	clusterWatcher, err := createClusterWatcher(iteration0IDs, testActions, StatusFailureRate)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer clusterWatcher.shutDown()
+
+	err = testActions.transitionAll()
+	
+    if err != nil {
+		// wait for auto7bd to be deleted		
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// wait for auto8bd to be deleted
+		err = waitForAutoDelete(testName, 0, clusterWatcher, iteration0IDs[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+    }
+}
+
