@@ -153,11 +153,24 @@ func sameAutoCreatedApplication(actual *appResourceInfo, expected *appResourceIn
 		ret = false
 	}
 
-	if !sameComponentKinds(actual.componentKinds, expected.componentKinds) {
-		if logger.IsEnabled(LogTypeInfo) {
-			logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication componentKinds different")
+	if !sameComponentKinds(actual.componentKinds, expected.componentKinds) {		
+		// componentKinds can be default group kinds when part-of label is set
+		if actual.resourceInfo.labels[AppPartOf] == expected.resourceInfo.labels[AppPartOf] {
+			// return true if actual component kinds contains expected component kinds			
+			for _, gk1 := range actual.componentKinds {				
+				for _, gk2 := range expected.componentKinds {
+					if gk1.group == gk2.group && gk1.kind == gk2.kind {
+						ret = true
+						break
+					}
+				}				
+			}
+		} else {		
+			if logger.IsEnabled(LogTypeInfo) {
+				logger.Log(CallerName(), LogTypeInfo, "sameAutoCreatedApplication componentKinds different")
+			}
+			ret = false
 		}
-		ret = false
 	}
 
 	if !sameLabels(actual.matchLabels, expected.matchLabels) {
@@ -498,7 +511,7 @@ func transitionHelper(ta *testActions) error {
 
 	// Calculate list of resource to add, delete, or modify
 	toAdd, toDelete, toModify := findResourceDelta(previousResources, ta.resources[ta.currentIteration])
-
+	
 	if logger.IsEnabled(LogTypeInfo) {
 		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s iteration [%d] toAdd: %d, toDelete: %d, toModify: %d\n", ta.testName, ta.currentIteration, len(toAdd), len(toDelete), len(toModify)))
 	}
@@ -529,11 +542,10 @@ func transitionHelper(ta *testActions) error {
 		resInfo.gvr = resToDelete.gvr
 		resInfo.namespace = resToDelete.namespace
 		resInfo.name = resToDelete.name
-
+		
 		if logger.IsEnabled(LogTypeInfo) {
 			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  deleting %s\n", ta.testName, resInfo.name))
 		}
-
 		err := deleteResource(ta.clusterWatcher, resInfo)
 		if err != nil {
 			return err
@@ -549,7 +561,6 @@ func transitionHelper(ta *testActions) error {
 		if logger.IsEnabled(LogTypeInfo) {
 			logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("test %s  modifying %s\n", ta.testName, resToModify.name))
 		}
-
 		err := modifyResource(ta.clusterWatcher, resToModify)
 		if err != nil {
 			return err

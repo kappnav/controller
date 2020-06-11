@@ -1,0 +1,33 @@
+{
+    "apiVersion": "app.k8s.io/v1beta1",
+    "kind": "Application",
+    "metadata": {      
+        "creationTimestamp": "2019-05-23T18:00:47Z",
+        "generation": 1,
+        "labels": {
+            "app": "auto7p-app",
+            "app.kubernetes.io/name": "auto7p-app",
+            "app.kubernetes.io/version": "1.0.0",
+            "app.kubernetes.io/part-of": "auto7p-app",
+            "kappnav.app.auto-created": "true"
+        },
+        "name": "auto7p-app",
+        "namespace": "default",
+        "resourceVersion": "454164",
+        "selfLink": "/apis/app.k8s.io/v1beta1/namespaces/default/applications/auto7p",
+        "uid": "b1081ebf-7d84-11e9-8623-00155de36603"
+    },
+    "spec": {
+        "componentKinds": [
+            {
+                "group": "apps",
+                "kind": "Deployment"
+            }
+        ],
+        "selector": {
+            "matchLabels": {
+                "app": "auto7p-app"
+            }
+        }
+    }
+}
