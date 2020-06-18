@@ -183,10 +183,10 @@ func stringToArrayOfLabelValues(inStr string) []string {
         Return  nil if the label kappnav.app.auto-create is not set to true.
        Note: If parsing error occurs for annotations, default values are used.
 */
-func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *autoCreateResourceInfo {
+func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj *unstructured.Unstructured) *autoCreateResourceInfo {	
 	resourceInfo := &autoCreateResourceInfo{}
 	resController.parseResource(unstructuredObj, &resourceInfo.resourceInfo)	
-
+	
 	// check if part-of label set
 	_, pok := resourceInfo.resourceInfo.labels[AppPartOf]
 	
@@ -245,22 +245,32 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	}
 
 	tmp, ok = annotations[AppAutoCreateKinds]
-	if !ok {
-		resourceInfo.autoCreateKinds = defaultKinds			
+	// if AppAutoCreateKinds annotation not specified, check if it is configured in kappnav CR
+	if !ok {	
+		resourceInfo.autoCreateKinds = getAutoCreateKindsFromKappnav(resController)	
+		if len(resourceInfo.autoCreateKinds) == 0 {
+			resourceInfo.autoCreateKinds = defaultKinds
+		}	
 	} else {
 		autoCreateKindsStr, ok := tmp.(string)
 		if !ok {
 			if logger.IsEnabled(LogTypeError) {
 				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s is not a string of comma separated kinds. Using default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
 			}
-			resourceInfo.autoCreateKinds = defaultKinds			
+			resourceInfo.autoCreateKinds = getAutoCreateKindsFromKappnav(resController)	
+			if len(resourceInfo.autoCreateKinds) == 0 {
+				resourceInfo.autoCreateKinds = defaultKinds
+			}				
 		} else {
 			arrayOfString := stringToArrayOfAlphaNumeric(autoCreateKindsStr)
 			if len(arrayOfString) == 0 {
 				if logger.IsEnabled(LogTypeError) {
 					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s does not contain comma separated kinds. Its current value is %s. Switching to default.", AppAutoCreateKinds, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name, autoCreateKindsStr))
-				}				
-				resourceInfo.autoCreateKinds = defaultKinds
+				}	
+				resourceInfo.autoCreateKinds = getAutoCreateKindsFromKappnav(resController)	
+				if len(resourceInfo.autoCreateKinds) == 0 {
+					resourceInfo.autoCreateKinds = defaultKinds
+				}					
 			} else {
 				/* Transform array of string to array of groupKind */
 				resourceInfo.autoCreateKinds = make([]groupKind, 0, len(arrayOfString))
@@ -361,6 +371,10 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 				resourceInfo.autoCreateLabelValues = []string{resourceInfo.autoCreateName}
 			} else {
 				resourceInfo.autoCreateLabelValues = labelValues
+				// check if partOf label is set in autoCreateLabel
+				if len(resourceInfo.autoCreateLabel) > 0 && resourceInfo.autoCreateLabel == AppPartOf && len(resourceInfo.autoCreateLabelValues) == 1 {
+					resourceInfo.partOfLabel = autoCreateValuesStr
+				}
 			}
 		}
 	}
@@ -391,7 +405,7 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 	}
 	
 	resourceInfo := resController.parseAutoCreateResourceInfo(eventData.obj.(*unstructured.Unstructured))	
-
+	
 	if resourceInfo == nil {		
 		if logger.IsEnabled(LogTypeDebug) {
 			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Not a resource to auto-create"))
@@ -464,11 +478,11 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 			}
 		} else { //AddFunc
 			// Update autoCreateNameMap when an auto-created app is added
-			if len(resourceInfo.partOfLabel) > 0 {			
+			if len(resourceInfo.partOfLabel) > 0 {	
 				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.partOfLabel)			
 			}
 			
-			if len(resourceInfo.autoCreateName) > 0 {			
+			if len(resourceInfo.autoCreateName) > 0 {	
 				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.autoCreateName)		
 			}
 		}
@@ -1113,6 +1127,64 @@ func removeCharacters(input string, characters string) string {
 
 }
 
+// fetch kappnav CR and get autoCreateKinds from kappnav CR
+func getAutoCreateKindsFromKappnav(resController *ClusterWatcher) []groupKind {
+	if logger.IsEnabled(LogTypeEntry) {
+		logger.Log(CallerName(), LogTypeEntry, "getAutoCreateKindsFromKappnav")
+	}
+	var autoCreateKinds []groupKind
+	gvr := schema.GroupVersionResource{
+		Group:    "kappnav.operator.kappnav.io",
+		Version:  "v1",
+		Resource: "kappnavs",
+	}
+	var intfNoNS = resController.plugin.dynamicClient.Resource(gvr)
+	var intf dynamic.ResourceInterface
+	// get interface from kappnav namespace
+	intf = intfNoNS.Namespace(getkAppNavNamespace())
+	// fetch the kappnav custom resource obj
+	var unstructuredObj *unstructured.Unstructured
+	var resName = "kappnav"
+	unstructuredObj, _ = intf.Get(resName, metav1.GetOptions{})
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("kappnav CR obj %s ", unstructuredObj))
+	}
+	if unstructuredObj != nil {
+		var objMap = unstructuredObj.Object
+		if objMap != nil {
+			tmp, _ := objMap[SPEC]
+			spec := tmp.(map[string]interface{})	
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("found kappnav CR spec %s ", spec))
+			}
+			tmp1, _ := spec["autoCreateKinds"]
+			autoCreateKindsMap := tmp1.([]interface{})	
+			if len(autoCreateKindsMap) > 0 { 
+				autoCreateKinds = make([]groupKind, 0, len(autoCreateKindsMap))
+				for _, autoCreateKind := range autoCreateKindsMap {
+					if logger.IsEnabled(LogTypeDebug) {
+						logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("found autoCreateKind %s ", autoCreateKind))
+					}
+					group := autoCreateKind.(map[string]interface{})["group"]						
+					kind := autoCreateKind.(map[string]interface{})["kind"]	
+					groupStr, gok := group.(string)
+					kindStr, kok := kind.(string)
+					if !gok {
+						groupStr = ""
+					}
+					if !kok {
+						kindStr = ""
+					}					
+					autoCreateKinds = append(autoCreateKinds, groupKind{groupStr, kindStr, nil})					
+				}	
+			}
+		}
+	}
+	if logger.IsEnabled(LogTypeInfo) {
+		logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("autoCreateKinds: %s ", autoCreateKinds))
+	}
+	return autoCreateKinds
+}
 
 /* updateAutoCreateAppNameMap updates autoCreateAppMap when a resource (i.e. deployment) is added or deleted in a namespace */
 func updateAutoCreateAppNameMap(resourceInfo *autoCreateResourceInfo, operation string, nameKey string) {
@@ -1201,4 +1273,3 @@ func updateAutoCreateAppNameMap(resourceInfo *autoCreateResourceInfo, operation 
 		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("autoCreateAppMap: %s ", autoCreateAppMap))				
 	}
 }
-
