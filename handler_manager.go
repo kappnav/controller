@@ -47,6 +47,7 @@ func newHandlerManager() *HandlerManager {
 	ret.setPrimaryHandler(coreKappNavGVR, &KAppNavHandler)
 	ret.addOtherHandler(coreDeploymentGVR, &autoCreateAppHandler)
 	ret.addOtherHandler(coreStatefulSetGVR, &autoCreateAppHandler)
+	ret.addOtherHandler(coreConfigMapGVR, &autoCreateKAMHandler)
 	return ret
 }
 
@@ -112,7 +113,7 @@ func (mgr *HandlerManager) callHandlers(gvr schema.GroupVersionResource, resCont
 		}
 		if resController.isEventPermitted(eventData) {
 			// Kinds: Deployment or StatefulSet
-			// Call all other handlers (currently only autoCreateAppHandler)
+			// Call all other handlers (currently only autoCreateAppHandler and autoCreateKAMHandler)
 			for _, otherHandler := range handler.otherHandlers {
 				err3 := (*otherHandler)(resController, rw, eventData)
 				if err3 != nil {
