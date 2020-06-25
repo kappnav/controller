@@ -63,10 +63,17 @@ var CRDNewHandler resourceActionFunc = func(resController *ClusterWatcher, rw *R
 				resController.AddToWatch(coreApplicationGVR)
 				resController.AddToWatch(coreDeploymentGVR)
 				resController.AddToWatch(coreStatefulSetGVR)
+				resController.AddToWatch(coreConfigMapGVR)
 				err = deleteOrphanedAutoCreatedApplications(resController)
 				if err != nil {
 					if logger.IsEnabled(LogTypeError) {
 						logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error deleting orphaned applications: %s", err))
+					}
+				}
+				err = deleteOrphanedAutoCreatedKAMs(resController)
+				if err != nil {
+					if logger.IsEnabled(LogTypeError) {
+						logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error deleting orphaned kams: %s", err))
 					}
 				}
 			}
