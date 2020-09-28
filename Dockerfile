@@ -48,13 +48,13 @@ ARG BUILD_DATE
 ARG COMMIT
 
 LABEL name="Application Navigator" \
-      version=$VERSION \
-      release=$VERSION \
-      created=$BUILD_DATE \
-      commit=$COMMIT \
-      vendor="kAppNav" \
-      summary="Controller image for Application Navigator" \
-      description="This image contains the Controller for Application Navigator"
+    version=$VERSION \
+    release=$VERSION \
+    created=$BUILD_DATE \
+    commit=$COMMIT \
+    vendor="kAppNav" \
+    summary="Controller image for Application Navigator" \
+    description="This image contains the Controller for Application Navigator"
 
 RUN microdnf -y install shadow-utils \
     && microdnf clean all \

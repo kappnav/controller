@@ -45,6 +45,7 @@ func newHandlerManager() *HandlerManager {
 	ret.setPrimaryHandler(coreApplicationGVR, &batchApplicationHandler)
 	ret.setPrimaryHandler(coreCustomResourceDefinitionGVR, &CRDNewHandler)
 	ret.setPrimaryHandler(coreKappNavGVR, &KAppNavHandler)
+	ret.setPrimaryHandler(coreClusterServiceVersionGVR, &CSVHandler)
 	ret.addOtherHandler(coreDeploymentGVR, &autoCreateAppHandler)
 	ret.addOtherHandler(coreStatefulSetGVR, &autoCreateAppHandler)
 	ret.addOtherHandler(coreConfigMapGVR, &autoCreateKAMHandler)

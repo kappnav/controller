@@ -181,6 +181,11 @@ var (
 		Version:  "v1beta1",
 		Resource: "customresourcedefinitions",
 	}
+	coreV1CustomResourceDefinitionGVR = schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}
 	coreApplicationGVR = schema.GroupVersionResource{
 		Group:    "app.k8s.io",
 		Version:  "v1beta1",
@@ -251,6 +256,11 @@ var (
 		Version:  "v1",
 		Resource: "kappnavs",
 	}
+	coreClusterServiceVersionGVR = schema.GroupVersionResource{
+		Group:    "operators.coreos.com",
+		Version:  "v1alpha1",
+		Resource: "clusterserviceversions",
+	}
 )
 
 func init() {
@@ -308,11 +318,29 @@ type ClusterWatcher struct {
 	gvrsToWatch         map[schema.GroupVersionResource]bool             // set of gvrs to watch for resources
 	apiVersionKindToGVR sync.Map
 	groupKindToGVR      sync.Map
+	csvOwners           sync.Map // map from a GVR to the CSVs that own the GVR's CRD
+	csvMutex            sync.Mutex
 	statusPrecedence    []string // array of status precedence
 	unknownStatus       string   // value of unkown status
 	namespaces          map[string]string
 	resourceChannel     *resourceChannel // channel to send application updates
 	mutex               sync.Mutex
+}
+
+// OwnedCRDInfo contains info about a CRD that is
+// owned by at least one ClusterServiceVersion (CSV).
+// It contains the gvr and name of the CRD resource
+// a set of GVRs/names of the CSVs that own the CRD
+type OwnedCRDInfo struct {
+	// crdGVR  schema.GroupVersionResource // GVR of the CRD
+	crdName string              // name of the CRD
+	csvs    map[CSVInfo]CSVInfo // set of CSVs that own the CRD
+}
+
+// CSVInfo contains the gvr and name of a CSV resource
+type CSVInfo struct {
+	csvGVR  schema.GroupVersionResource
+	csvName string
 }
 
 // NewClusterWatcher creates a new ClusterWatcher
@@ -770,8 +798,10 @@ func (resController *ClusterWatcher) addResourceMapEntry(kind string, group stri
 		// Watch the resource if it should be watched
 		resController.mutex.Unlock()
 		resController.restartWatch(rw.GroupVersionResource)
+		if rw.GroupVersionResource == coreClusterServiceVersionGVR {
+			resController.initCSVOperationActions()
+		}
 	}
-
 	if logger.IsEnabled(LogTypeExit) {
 		logger.Log(CallerName(), LogTypeExit, "")
 	}
@@ -1442,7 +1472,7 @@ func (resController *ClusterWatcher) addGVR(obj interface{}) (gvr schema.GroupVe
 		}
 		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: plural}
 		if logger.IsEnabled(LogTypeDebug) {
-			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Returning GVR: %s", gvr))
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("returning GVR: %v", gvr))
 		}
 		return gvr
 	default:
@@ -1453,39 +1483,21 @@ func (resController *ClusterWatcher) addGVR(obj interface{}) (gvr schema.GroupVe
 	}
 }
 
-// Modify kind to resource map
-/*
-func (resController *ClusterWatcher) modifyKind(obj interface{} ) (kind string) {
-	switch  obj.(type) {
-		case *unstructured.Unstructured:
-			var unstructuredObj *unstructured.Unstructured = obj.(*unstructured.Unstructured)
-			group, version, plural, kind, _ := getCRDGVRKindSubresource(unstructuredObj)
-			if group != "" {
-				resController.addResourceMapEntry(kind, group, version, plural)
-			}
-			return kind
-		 default:
-			klog.Errorf("CRDHandler.addNewKind: not Unstructured: type: %T val: %s\n",  obj, obj);
-			return ""
-	}
-}
-*/
-
 // Delete a GVR from resource map
 func (resController *ClusterWatcher) deleteGVR(obj interface{}) (gvr schema.GroupVersionResource) {
 	switch obj.(type) {
 	case *unstructured.Unstructured:
 		var unstructuredObj = obj.(*unstructured.Unstructured)
-		var gvr schema.GroupVersionResource
 		group, version, plural, kind, _, _ := getCRDGVRKindSubresource(unstructuredObj)
-		resController.deleteResourceMapEntry(schema.GroupVersionResource{Group: group, Version: version, Resource: plural}, kind)
-		return gvr
+		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: plural}
+		resController.deleteResourceMapEntry(gvr, kind)
+		resController.csvOwners.Delete(gvr)
 	default:
 		if logger.IsEnabled(LogTypeError) {
 			logger.Log(CallerName(), LogTypeError, fmt.Sprintf("object not Unstructured: type: %T val: %s\n", obj, obj))
 		}
-		return schema.GroupVersionResource{}
 	}
+	return schema.GroupVersionResource{}
 }
 
 // Create a ListWatcher to iterate over resources for client side cache
