@@ -8,7 +8,6 @@
         "creationTimestamp": "2019-05-23T17:54:28Z",
         "generation": 2,
         "labels": {
-            "app": "auto7p-app",
             "app.kubernetes.io/part-of": "auto7p-app"
         },
         "name": "auto9p",
@@ -23,7 +22,7 @@
         "revisionHistoryLimit": 10,
         "selector": {
             "matchLabels": {
-                "my-app": "auto7p-app"
+                "app.kubernetes.io/part-of": "auto7p-app"
             }
         },
         "strategy": {
@@ -37,7 +36,7 @@
             "metadata": {
                 "creationTimestamp": null,
                 "labels": {
-                    "my-app": "auto7p-app"
+                    "app.kubernetes.io/part-of": "auto7p-app"
                 }
             },
             "spec": {

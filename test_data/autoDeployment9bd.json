@@ -27,7 +27,7 @@
         "revisionHistoryLimit": 10,
         "selector": {
             "matchLabels": {
-                "my-app": "auto7bd-app"
+                "app": "auto7bd-app"
             }
         },
         "strategy": {
@@ -41,7 +41,7 @@
             "metadata": {
                 "creationTimestamp": null,
                 "labels": {
-                    "my-app": "auto7bd-app"
+                    "app": "auto7bdf-app"
                 }
             },
             "spec": {

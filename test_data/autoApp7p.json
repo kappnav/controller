@@ -5,7 +5,6 @@
         "creationTimestamp": "2019-05-23T18:00:47Z",
         "generation": 1,
         "labels": {
-            "app": "auto7p-app",
             "app.kubernetes.io/name": "auto7p-app",
             "app.kubernetes.io/version": "1.0.0",
             "app.kubernetes.io/part-of": "auto7p-app",
@@ -26,7 +25,7 @@
         ],
         "selector": {
             "matchLabels": {
-                "app": "auto7p-app"
+                "app.kubernetes.io/part-of": "auto7p-app"
             }
         }
     }

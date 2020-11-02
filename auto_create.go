@@ -56,6 +56,7 @@ const (
 	AppPartOf = "app.kubernetes.io/part-of"
 
 	namespaceRegex = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+
 )
 
 /* default kinds for auto-created app*/
@@ -210,11 +211,12 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	} else {
 		labels = make(map[string]interface{})
 	}
+	
 	tmpP, ok := labels[AppPartOf] //ignore !ok and it shuold not happen
 	if ok {
 		resourceInfo.partOfLabel, ok = tmpP.(string)
 		if ok {
-			resourceInfo.partOfLabel = toDomainName(resourceInfo.partOfLabel)
+			resourceInfo.partOfLabel = toDomainName(resourceInfo.partOfLabel)		
 		}
 	}
 
@@ -336,6 +338,9 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	tmp, ok = annotations[AppAutoCreateLabel]
 	if !ok {
 		resourceInfo.autoCreateLabel = defaultAutoCreateAppLabel
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using default %v", resourceInfo))
+		}
 	} else {
 		resourceInfo.autoCreateLabel, ok = tmp.(string)
 		if !ok {
@@ -343,8 +348,14 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resoruce %s/%s is not a string. Using default.", AppAutoCreateLabel, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
 			}
 			resourceInfo.autoCreateLabel = defaultAutoCreateAppLabel
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using default2 %v", resourceInfo))
+			}
 		} else {
 			resourceInfo.autoCreateLabel = toLabel(resourceInfo.autoCreateLabel)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Using default3 %v", resourceInfo.autoCreateLabel))
+			}
 		}
 	}
 	tmp, ok = annotations[AppAutoCreateLabelValues]
@@ -417,12 +428,12 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 				if logger.IsEnabled(LogTypeInfo) {
 					logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Applications no longer auto-created for resource %s, kind: %s. Deleting existing auto-created application", key, oldResInfo.kind))
 				}
-				if len(oldResInfo.partOfLabel) > 0 {
-					deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.partOfLabel)
-				}
 				if len(oldResInfo.autoCreateName) > 0 {
 					deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.autoCreateName)
 				}
+				if len(oldResInfo.partOfLabel) > 0 {
+					deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.partOfLabel)
+				}				
 			}
 		}
 		return nil
@@ -433,15 +444,13 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 		if logger.IsEnabled(LogTypeDebug) {
 			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing deleted resource %s", key))
 		}
-
 		// Delete auto-created applications
-		if len(resourceInfo.partOfLabel) > 0 {
-			deleteAutoCreatedApplicationsForResource(resController, rw, resourceInfo, resourceInfo.partOfLabel)
-		}
 		if len(resourceInfo.autoCreateName) > 0 {
 			deleteAutoCreatedApplicationsForResource(resController, rw, resourceInfo, resourceInfo.autoCreateName)
 		}
-
+		if len(resourceInfo.partOfLabel) > 0 {
+			deleteAutoCreatedApplicationsForResource(resController, rw, resourceInfo, resourceInfo.partOfLabel)
+		}
 	} else if eventData.funcType == UpdateFunc || eventData.funcType == AddFunc {
 		if logger.IsEnabled(LogTypeDebug) {
 			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("processing add/update resource : %s, kind: %s", key, resourceInfo.kind))
@@ -453,42 +462,41 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 				if (len(oldResInfo.autoCreateName) > 0 && len(resourceInfo.autoCreateName) > 0 && oldResInfo.autoCreateName != resourceInfo.autoCreateName) ||
 					(len(oldResInfo.partOfLabel) > 0 && len(resourceInfo.partOfLabel) > 0 && oldResInfo.partOfLabel != resourceInfo.partOfLabel) {
 					//name of auto created resource changed. Delete the old one
-					if len(resourceInfo.partOfLabel) > 0 {
-						if logger.IsEnabled(LogTypeInfo) {
-							logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Auto-created application for resource kind %s, name %s changed from %s to %s. Deleting existing auto-created application", resourceInfo.kind, key, oldResInfo.partOfLabel, resourceInfo.partOfLabel))
-						}
-						deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.partOfLabel)
-					}
 					if len(resourceInfo.autoCreateName) > 0 {
 						if logger.IsEnabled(LogTypeInfo) {
 							logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Auto-created application for resource kind %s, name %s changed from %s to %s. Deleting existing auto-created application", resourceInfo.kind, key, oldResInfo.autoCreateName, resourceInfo.autoCreateName))
 						}
 						deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.autoCreateName)
 					}
+					if len(resourceInfo.partOfLabel) > 0 {
+						if logger.IsEnabled(LogTypeInfo) {
+							logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Auto-created application for resource kind %s, name %s changed from %s to %s. Deleting existing auto-created application", resourceInfo.kind, key, oldResInfo.partOfLabel, resourceInfo.partOfLabel))
+						}
+						deleteAutoCreatedApplicationsForResource(resController, rw, oldResInfo, oldResInfo.partOfLabel)
+					}			
 				} else {
 					// Update autoCreateName array in case resource is changed
-					if len(resourceInfo.partOfLabel) > 0 {
-						updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.partOfLabel)
-					}
 					if len(resourceInfo.autoCreateName) > 0 {
 						updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.autoCreateName)
 					}
+					if len(resourceInfo.partOfLabel) > 0 {
+						updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.partOfLabel)
+					}			
 				}
 			}
 		} else { //AddFunc
-			// Update autoCreateNameMap when an auto-created app is added
-			if len(resourceInfo.partOfLabel) > 0 {
-				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.partOfLabel)
-			}
-
+			// Update autoCreateNameMap when an auto-created app is added.   
 			if len(resourceInfo.autoCreateName) > 0 {
 				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.autoCreateName)
+			}
+			if len(resourceInfo.partOfLabel) > 0 {
+				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.partOfLabel)
 			}
 		}
 
 		//create or modify app
-		if len(resourceInfo.partOfLabel) > 0 {
-			err := autoCreateModifyApplication(resController, rw, resourceInfo, resourceInfo.partOfLabel)
+		if len(resourceInfo.autoCreateName) > 0 {
+			err := autoCreateModifyApplication(resController, rw, resourceInfo, resourceInfo.autoCreateName)
 			if err != nil {
 				if logger.IsEnabled(LogTypeError) {
 					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error processing processig add/update resource %s: %s", key, err))
@@ -496,8 +504,8 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 				return err
 			}
 		}
-		if len(resourceInfo.autoCreateName) > 0 {
-			err := autoCreateModifyApplication(resController, rw, resourceInfo, resourceInfo.autoCreateName)
+		if len(resourceInfo.partOfLabel) > 0 {
+			err := autoCreateModifyApplication(resController, rw, resourceInfo, resourceInfo.partOfLabel)
 			if err != nil {
 				if logger.IsEnabled(LogTypeError) {
 					logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Error processing processig add/update resource %s: %s", key, err))
@@ -580,6 +588,9 @@ func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw 
 	return nil
 }
 
+
+// When creating or modifying an application, we will look at autoCreateName annotation first in case both autoCreateName annotation and 
+// part-of label are specified in application and autoCreateName will be used if both values are different
 func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatcher, resInfo *autoCreateResourceInfo, nameKey string) error {
 	if logger.IsEnabled(LogTypeEntry) {
 		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("From %s/%s for auto-created: %s", resInfo.resourceInfo.namespace, resInfo.resourceInfo.name, nameKey))
@@ -599,10 +610,10 @@ func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatc
 		var err error
 
 		unstructuredObj, err = intf.Get(nameKey, metav1.GetOptions{})
-
+				
 		// create app
 		if err != nil {
-			/* TODO: check error. Most likely resource does not exist */
+			/* TODO: check error. Most likely resource does not exist */			
 			err = createApplication(resController, rw, resInfo, nameKey)
 			return err
 		}
@@ -634,6 +645,7 @@ func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatc
 				logger.Log(CallerName(), LogTypeInfo, fmt.Sprintf("Changing autocreated application annotations and labels for %s/%s", resInfo.namespace, nameKey))
 			}
 			setApplicationAnnotationLabels(unstructuredObj, resInfo, nameKey)
+			
 			_, err = intf.Update(unstructuredObj, metav1.UpdateOptions{})
 			if err != nil {
 				if logger.IsEnabled(LogTypeError) {
@@ -682,8 +694,7 @@ var autoCreatedAppJSONPartOfTemplate = "{ {{__NEWLINE__}}" +
 	"             \"kappnav.app.auto-created\": \"true\",{{__NEWLINE__}}" +
 	"             \"app.kubernetes.io/name\": \"{{__APP_NAME__}}\", {{__NEWLINE__}}" +
 	"             \"app.kubernetes.io/version\": \"{{__APP_VERSION__}}\", {{__NEWLINE__}}" +
-	"             \"app.kubernetes.io/part-of\": \"{{__APP_NAME__}}\", {{__NEWLINE__}}" +
-	"             \"{{__APP_LABEL__}}\": \"{{__APP_NAME__}}\" {{__NEWLINE__}}" +
+	"             \"app.kubernetes.io/part-of\": \"{{__APP_NAME__}}\" {{__NEWLINE__}}" +
 	"        },{{__NEWLINE__}}" +
 	"        \"name\": \"{{__APP_NAME__}}\",{{__NEWLINE__}}" +
 	"        \"namespace\": \"{{__NAMESPACE__}}\"{{__NEWLINE__}}" +
@@ -696,8 +707,10 @@ var autoCreatedAppJSONPartOfTemplate = "{ {{__NEWLINE__}}" +
 	"}{{__NEWLINE__}}"
 
 var autoCreateMatchLabel = "\"matchLabels\": { \"{{__APP_LABEL__}}\": \"{{__LABEL_VALUE__}}\"  } "
+var autoCreateMatchLabelPartOf = "\"matchLabels\": { \"{{__PART_OF_LABEL__}}\": \"{{__LABEL_VALUE__}}\"  } "
 
 var autoCreateMatchExpression = "\"matchExpressions\": [ { \"key\": \"{{__APP_LABEL__}}\",  \"operator\": \"In\", \"values\": [{{__MATCH_VALUES__}}] } ]}"
+var autoCreateMatchExpressionPartOf = "\"matchExpressions\": [ { \"key\": \"{{__PART_OF_LABEL__}}\",  \"operator\": \"In\", \"values\": [{{__MATCH_VALUES__}}] } ]}"
 
 func getApplicationJSON(resInfo *autoCreateResourceInfo, nameKey string) string {
 	var template string
@@ -705,12 +718,13 @@ func getApplicationJSON(resInfo *autoCreateResourceInfo, nameKey string) string 
 	if resInfo.partOfLabel == nameKey {
 		template = strings.Replace(autoCreatedAppJSONPartOfTemplate, "{{__NEWLINE__}}", "\n", -1)
 		template = strings.Replace(template, "{{__APP_NAME__}}", resInfo.partOfLabel, -1)
+		template = strings.Replace(template, "{{__PART_OF_LABEL__}}", "app.kubernetes.io/part-of", -1)
 	} else { // for autoCreateName
 		template = strings.Replace(autoCreatedAppJSONTemplate, "{{__NEWLINE__}}", "\n", -1)
 		template = strings.Replace(template, "{{__APP_NAME__}}", resInfo.autoCreateName, -1)
+		template = strings.Replace(template, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
 	}
 
-	template = strings.Replace(template, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
 	template = strings.Replace(template, "{{__APP_VERSION__}}", resInfo.autoCreateVersion, -1)
 	template = strings.Replace(template, "{{__NAMESPACE__}}", resInfo.namespace, -1)
 
@@ -727,17 +741,26 @@ func getApplicationJSON(resInfo *autoCreateResourceInfo, nameKey string) string 
 	var selectorValue string
 
 	if len(resInfo.autoCreateLabelValues) == 1 {
-		selectorValue = strings.Replace(autoCreateMatchLabel, "{{__NEWLINE__}}", "\n", -1)
-		selectorValue = strings.Replace(selectorValue, "{{__NEWLINE__}}", "\n", -1)
-		selectorValue = strings.Replace(selectorValue, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
 		if nameKey == resInfo.autoCreateName {
+			selectorValue = strings.Replace(autoCreateMatchLabel, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
 			selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.autoCreateLabelValues[0], -1)
-		} else {
-			selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.partOfLabel, -1)
-		}
+		} else { //part-of
+			selectorValue = strings.Replace(autoCreateMatchLabelPartOf, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__PART_OF_LABEL__}}", "app.kubernetes.io/part-of", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.partOfLabel, -1)	
+		} 
 	} else {
-		selectorValue = strings.Replace(autoCreateMatchExpression, "{{__NEWLINE__}}", "\n", -1)
-		selectorValue = strings.Replace(selectorValue, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
+		if nameKey == resInfo.autoCreateName {
+			selectorValue = strings.Replace(autoCreateMatchExpression, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__APP_LABEL__}}", resInfo.autoCreateLabel, -1)
+		} else { //part-of
+			selectorValue = strings.Replace(autoCreateMatchExpressionPartOf, "{{__NEWLINE__}}", "\n", -1)
+			selectorValue = strings.Replace(selectorValue, "{{__PART_OF_LABEL__}}", "app.kubernetes.io/part-of", -1)
+		} 
+		
 		matchValuesStr := ""
 		for index, value := range resInfo.autoCreateLabelValues {
 			matchValuesStr += "\"" + value + "\""
@@ -772,16 +795,16 @@ func createApplication(resController *ClusterWatcher, rw *ResourceWatcher, resIn
 		if logger.IsEnabled(LogTypeDebug) {
 			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("createApplication JSON: %s", template))
 		}
-
+		
 		var unstructuredObj = &unstructured.Unstructured{}
 		err := unstructuredObj.UnmarshalJSON([]byte(template))
 		if err != nil {
 			if logger.IsEnabled(LogTypeError) {
-				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to convert JSON %s to unstructured", template))
+				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Unable to convert JSON %s to unstructured.  Error: %s", template, err))
 			}
 			return err
 		}
-
+		
 		_, err = intf.Create(unstructuredObj, metav1.CreateOptions{})
 		if err != nil {
 			if logger.IsEnabled(LogTypeError) {
@@ -831,6 +854,7 @@ func setApplicationAnnotationLabels(unstructuredObj *unstructured.Unstructured, 
 	// set part-of label
 	labels := make(map[string]interface{})
 	metadata[LABELS] = labels
+
 	if nameKey == resInfo.autoCreateName {
 		labels[resInfo.autoCreateLabel] = resInfo.autoCreateName
 		labels[labelName] = resInfo.autoCreateName
@@ -838,6 +862,7 @@ func setApplicationAnnotationLabels(unstructuredObj *unstructured.Unstructured, 
 		labels[AppPartOf] = resInfo.partOfLabel
 		labels[labelName] = resInfo.partOfLabel
 	}
+	
 	labels[labelVersion] = resInfo.autoCreateVersion
 	labels[labelAutoCreate] = "true"
 
@@ -853,31 +878,57 @@ func setApplicationAnnotationLabels(unstructuredObj *unstructured.Unstructured, 
 	selectorObj, ok := spec[SELECTOR]
 	if !ok {
 		selector = make(map[string]interface{})
-		spec[SELECTOR] = selector
+		spec[SELECTOR] = selector		
 	} else {
 		selector = selectorObj.(map[string]interface{})
 	}
 
-	if len(resInfo.autoCreateLabelValues) == 1 {
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("selector: %v", selector))
+	}
+
+	if len(resInfo.autoCreateLabelValues) == 1 || nameKey == resInfo.partOfLabel {
 		matchLabels := make(map[string]interface{})
-		selector[MATCHLABELS] = matchLabels
-		matchLabels[resInfo.autoCreateLabel] = resInfo.autoCreateLabelValues[0]
+		selector[MATCHLABELS] = matchLabels	
+		if nameKey == resInfo.autoCreateName { 
+			if len(resInfo.autoCreateLabelValues) == 1 {
+				matchLabels[resInfo.autoCreateLabel] = resInfo.autoCreateLabelValues[0]
+			}
+		} else { //part-of
+			matchLabels[AppPartOf] = resInfo.partOfLabel
+		}
+		
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("matchLabels: %v", matchLabels))
+		}
 		delete(selector, MATCHEXPRESSIONS)
 	} else {
 		delete(selector, MATCHLABELS)
-
 		matchExpressions := make([]interface{}, 0)
 		expression := make(map[string]interface{})
 		matchExpressions = append(matchExpressions, expression)
 		selector[MATCHEXPRESSIONS] = matchExpressions
 
-		expression[KEY] = resInfo.autoCreateLabel
-		expression[OPERATOR] = OperatorIn
-		values := make([]interface{}, 0)
-		for _, val := range resInfo.autoCreateLabelValues {
-			values = append(values, val)
+		if nameKey == resInfo.autoCreateName {
+			expression[KEY] = resInfo.autoCreateLabel
+		} else {
+			expression[KEY] = AppPartOf
 		}
+
+		expression[OPERATOR] = OperatorIn
+
+		values := make([]interface{}, 0)
+		if nameKey == resInfo.autoCreateName {
+			for _, val := range resInfo.autoCreateLabelValues {
+				values = append(values, val)
+			}
+		} else {
+			values = append(values, resInfo.partOfLabel)
+		} 
 		expression[VALUES] = values
+		if logger.IsEnabled(LogTypeDebug) {
+			logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("matchExpression: %v", expression))
+		}
 	}
 
 	componentKinds := make([]interface{}, 0)
@@ -915,6 +966,7 @@ func sameStringArray(array1 []string, array2 []string) bool {
 	}
 	return true
 }
+
 func stringArrayToString(array []string) string {
 	ret := "["
 	length := len(array)
@@ -951,21 +1003,21 @@ func sameMatchExpressions(expressions1 []matchExpression, expressions2 []matchEx
 func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *autoCreateResourceInfo, nameKey string) bool {
 
 	/* Check if auto-create labels have changed */
-	if nameKey == resInfo.partOfLabel {
-		if appResInfo.labels[resInfo.autoCreateLabel] != resInfo.partOfLabel {
-			if logger.IsEnabled(LogTypeDebug) {
-				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Labels mismatch. Label: %s, label value in app: %s label value in original resource: %s", resInfo.autoCreateLabel, appResInfo.labels[resInfo.autoCreateLabel], resInfo.autoCreateName))
-			}
-			return true
-		}
-	} else { //autoCreateLabel
+	if nameKey == resInfo.autoCreateName {
 		if appResInfo.labels[resInfo.autoCreateLabel] != resInfo.autoCreateName {
 			if logger.IsEnabled(LogTypeDebug) {
 				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Labels mismatch. Label: %s, label value in app: %s label value in original resource: %s", resInfo.autoCreateLabel, appResInfo.labels[resInfo.autoCreateLabel], resInfo.autoCreateName))
 			}
 			return true
 		}
-	}
+	} else { //part-of
+		if appResInfo.labels[AppPartOf] != resInfo.partOfLabel {
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Labels mismatch. Label: %s, label value in app: %s , label value in original resource: %s", AppPartOf, appResInfo.labels[AppPartOf], resInfo.partOfLabel))
+			}
+			return true
+		}
+	} 
 
 	if appResInfo.labels[labelVersion] != resInfo.autoCreateVersion {
 		if logger.IsEnabled(LogTypeDebug) {
@@ -985,6 +1037,10 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 	/* check if selectors have changed */
 	lenMatchLabels := len(appResInfo.matchLabels)
 	lenMatchExpressions := len(appResInfo.matchExpressions)
+
+	if logger.IsEnabled(LogTypeDebug) {
+		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match labels and expressions: %v, %v", appResInfo.matchLabels, appResInfo.matchExpressions))
+	}
 	if lenMatchLabels > 0 && lenMatchExpressions > 0 {
 		// shouldn't happen
 		if logger.IsEnabled(LogTypeDebug) {
@@ -1000,21 +1056,33 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 			}
 			return true
 		}
-		if appResInfo.matchLabels[resInfo.autoCreateLabel] != resInfo.autoCreateLabelValues[0] {
-			if logger.IsEnabled(LogTypeDebug) {
-				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match label values mismatch. Created app: %s: %s, original resource: %s", resInfo.autoCreateLabel, appResInfo.matchLabels[resInfo.autoCreateLabel], resInfo.autoCreateLabelValues[0]))
+		if nameKey == resInfo.autoCreateName {
+			if appResInfo.matchLabels[resInfo.autoCreateLabel] != resInfo.autoCreateLabelValues[0] {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match label values mismatch. Created app: %s: %s, original resource: %s", resInfo.autoCreateLabel, appResInfo.matchLabels[resInfo.autoCreateLabel], resInfo.autoCreateLabelValues[0]))
+				}
+				// labels don't match
+				return true
 			}
-			// labels don't match
-			return true
-		}
+		} else { //part-of
+			if appResInfo.matchLabels[AppPartOf] != resInfo.partOfLabel {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match label values mismatch. Created app: %s: %s, original resource: %s", AppPartOf, appResInfo.matchLabels[AppPartOf], resInfo.partOfLabel))
+				}
+				// labels don't match
+				return true
+			}
+		} 
 	} else if lenMatchExpressions == 1 {
 		matchExpression := appResInfo.matchExpressions[0]
-		if matchExpression.key != resInfo.autoCreateLabel {
+		// key != "app" && key != "app.kubernetes.io/part-of"
+		if matchExpression.key != AppPartOf && matchExpression.key != resInfo.autoCreateLabel {
 			if logger.IsEnabled(LogTypeDebug) {
 				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Match expression key mismatch. Created app key: %s, original resource key: %s", matchExpression.key, resInfo.autoCreateLabel))
 			}
 			return true
 		}
+
 		if matchExpression.operator != OperatorIn {
 			if logger.IsEnabled(LogTypeDebug) {
 				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Create app operation is not %s", OperatorIn))
@@ -1022,12 +1090,24 @@ func autoCreatedApplicationNeedsUpdate(appResInfo *appResourceInfo, resInfo *aut
 			return true
 		}
 
-		if !sameStringArray(matchExpression.values, resInfo.autoCreateLabelValues) {
-			if logger.IsEnabled(LogTypeDebug) {
-				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Mismatched expression values. Create app values: %s, original resource values: %s", stringArrayToString(matchExpression.values), stringArrayToString(resInfo.autoCreateLabelValues)))
+		// autoCreateName
+		if nameKey == resInfo.autoCreateName {
+			if !sameStringArray(matchExpression.values, resInfo.autoCreateLabelValues) {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Mismatched expression values. Create app values: %s, original resource values: %s", stringArrayToString(matchExpression.values), stringArrayToString(resInfo.autoCreateLabelValues)))
+				}
+				return true
 			}
-			return true
-		}
+		} else { //part-of
+			var partOfArray []string
+			partOfArray[0] = resInfo.partOfLabel
+			if !sameStringArray(matchExpression.values, partOfArray) {
+				if logger.IsEnabled(LogTypeDebug) {
+					logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("Mismatched expression values. Create app values: %s, original resource values: %s", stringArrayToString(matchExpression.values), partOfArray))
+				}
+				return true
+			}
+		} 
 	} else {
 		// shouldn't happen
 		if logger.IsEnabled(LogTypeDebug) {
@@ -1143,9 +1223,7 @@ func getAutoCreateKindsFromKappnav(resController *ClusterWatcher) []groupKind {
 	var unstructuredObj *unstructured.Unstructured
 	var resName = "kappnav"
 	unstructuredObj, _ = intf.Get(resName, metav1.GetOptions{})
-	if logger.IsEnabled(LogTypeDebug) {
-		logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("kappnav CR obj %s ", unstructuredObj))
-	}
+	
 	if unstructuredObj != nil {
 		var objMap = unstructuredObj.Object
 		if objMap != nil {

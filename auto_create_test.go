@@ -665,7 +665,7 @@ func TestAutoCreateStatefulSet(t *testing.T) {
     }
 }
 
-/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to same app
+/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to same app, verify with matching label "app" value
  */
  func TestAutoCreatePartOfLabelAndAutoCreateNameMultipleDeployments(t *testing.T) {
     testName := "TestAutoCreatePartOfLabelAndAutoCreateNameMultipleDeployments"
@@ -747,7 +747,7 @@ func TestAutoCreateStatefulSet(t *testing.T) {
     }
 }
 
-/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to different apps
+/* Test auto create when multiple deployments containin both part-of label and autoCreateName associate to different apps and auto-create name has higher priority 
  */
  func TestAutoCreatePartOfLabelAndAutoCreateNameWithDiffApps(t *testing.T) {
     testName := "TestAutoCreatePartOfAutoCreateNameWithDiffAppsMultipleDeployments"
