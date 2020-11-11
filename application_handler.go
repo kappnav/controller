@@ -76,7 +76,8 @@ func labelsMatch(matchLabels map[string]string, labels map[string]string) bool {
 			}
 			return false
 		}
-		if strings.Compare(val, otherVal) != 0 {
+	
+		if strings.ToLower(val) != strings.ToLower(otherVal) {
 			if logger.IsEnabled(LogTypeExit) {
 				logger.Log(CallerName(), LogTypeExit, "false\n ")
 			}
@@ -134,7 +135,7 @@ func getGroupFromAPIVersion(apiVersion string) string {
 // return true if the input string is contaied in array of strings
 func isContainedInStringArray(arr []string, inStr string) bool {
 	for _, str := range arr {
-		if strings.Compare(str, inStr) == 0 {
+		if strings.ToLower(str) == strings.ToLower(inStr) {
 			return true
 		}
 	}
@@ -369,7 +370,7 @@ func getApplicationsForResource(resController *ClusterWatcher, resInfo *resource
 		}
 	}
 	if logger.IsEnabled(LogTypeExit) {
-		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("%v", ret))
+		logger.Log(CallerName(), LogTypeExit, fmt.Sprintf("getApplicationsForResource %v", ret))
 	}
 	return ret
 }
@@ -427,6 +428,7 @@ var batchResourceHandler resourceActionFunc = func(resController *ClusterWatcher
 	} else {
 		var resInfo = &resourceInfo{}
 		resController.parseResource(eventData.obj.(*unstructured.Unstructured), resInfo)
+		
 		if eventData.funcType == UpdateFunc {
 			if logger.IsEnabled(LogTypeDebug) {
 				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processig updated resource : %s\n", key))
@@ -531,7 +533,7 @@ var batchApplicationHandler resourceActionFunc = func(resController *ClusterWatc
 		if eventData.funcType == UpdateFunc {
 			// application updated
 			if logger.IsEnabled(LogTypeDebug) {
-				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing application updated: %s\n", key))
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("    processing application updated: %s", key))
 			}
 
 			var oldResInfo = &resourceInfo{}

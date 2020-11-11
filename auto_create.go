@@ -77,6 +77,7 @@ type autoCreateResourceInfo struct {
 	autoCreateLabel       string
 	autoCreateLabelValues []string
 	partOfLabel           string
+	orgPartOfLabel        string
 }
 
 /* map to track app name being added or deleted for an auto creation name */
@@ -216,7 +217,13 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 	if ok {
 		resourceInfo.partOfLabel, ok = tmpP.(string)
 		if ok {
+			// original part-of label value
+			resourceInfo.orgPartOfLabel = resourceInfo.partOfLabel
+			// converted part-of value to lower case
 			resourceInfo.partOfLabel = toDomainName(resourceInfo.partOfLabel)		
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("original partOfLabel: %s, converted value: %s", resourceInfo.orgPartOfLabel, resourceInfo.partOfLabel))
+			}
 		}
 	}
 
@@ -240,8 +247,11 @@ func (resController *ClusterWatcher) parseAutoCreateResourceInfo(unstructuredObj
 				logger.Log(CallerName(), LogTypeError, fmt.Sprintf("Metadata %s for resource %s/%s is not a string. Using default.", AppAutoCreateName, resourceInfo.resourceInfo.namespace, resourceInfo.resourceInfo.name))
 			}
 			resourceInfo.autoCreateName = resourceInfo.name
-		} else {
+		} else {		
 			resourceInfo.autoCreateName = toDomainName(resourceInfo.autoCreateName)
+			if logger.IsEnabled(LogTypeDebug) {
+				logger.Log(CallerName(), LogTypeDebug, fmt.Sprintf("autoCreateName: %s", resourceInfo.autoCreateName))
+			}
 		}
 	}
 
@@ -485,7 +495,7 @@ var autoCreateAppHandler resourceActionFunc = func(resController *ClusterWatcher
 				}
 			}
 		} else { //AddFunc
-			// Update autoCreateNameMap when an auto-created app is added.   
+			// Update autoCreateNameMap when an auto-created app is added			
 			if len(resourceInfo.autoCreateName) > 0 {
 				updateAutoCreateAppNameMap(resourceInfo, "add", resourceInfo.autoCreateName)
 			}
@@ -588,9 +598,6 @@ func deleteAutoCreatedApplicationsForResource(resController *ClusterWatcher, rw 
 	return nil
 }
 
-
-// When creating or modifying an application, we will look at autoCreateName annotation first in case both autoCreateName annotation and 
-// part-of label are specified in application and autoCreateName will be used if both values are different
 func autoCreateModifyApplication(resController *ClusterWatcher, rw *ResourceWatcher, resInfo *autoCreateResourceInfo, nameKey string) error {
 	if logger.IsEnabled(LogTypeEntry) {
 		logger.Log(CallerName(), LogTypeEntry, fmt.Sprintf("From %s/%s for auto-created: %s", resInfo.resourceInfo.namespace, resInfo.resourceInfo.name, nameKey))
@@ -750,7 +757,13 @@ func getApplicationJSON(resInfo *autoCreateResourceInfo, nameKey string) string 
 			selectorValue = strings.Replace(autoCreateMatchLabelPartOf, "{{__NEWLINE__}}", "\n", -1)
 			selectorValue = strings.Replace(selectorValue, "{{__NEWLINE__}}", "\n", -1)
 			selectorValue = strings.Replace(selectorValue, "{{__PART_OF_LABEL__}}", "app.kubernetes.io/part-of", -1)
-			selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.partOfLabel, -1)	
+			
+			//if part-of label is different from original, use original value
+			if resInfo.orgPartOfLabel != resInfo.partOfLabel {
+				selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.orgPartOfLabel, -1)	
+			} else {
+				selectorValue = strings.Replace(selectorValue, "{{__LABEL_VALUE__}}", resInfo.partOfLabel, -1)	
+			}
 		} 
 	} else {
 		if nameKey == resInfo.autoCreateName {
@@ -762,11 +775,15 @@ func getApplicationJSON(resInfo *autoCreateResourceInfo, nameKey string) string 
 		} 
 		
 		matchValuesStr := ""
-		for index, value := range resInfo.autoCreateLabelValues {
-			matchValuesStr += "\"" + value + "\""
-			if index < len(resInfo.autoCreateLabelValues)-1 {
-				matchValuesStr += ", "
+		if nameKey == resInfo.autoCreateName {
+			for index, value := range resInfo.autoCreateLabelValues {
+				matchValuesStr += "\"" + value + "\""
+				if index < len(resInfo.autoCreateLabelValues)-1 {
+					matchValuesStr += ", "
+				}
 			}
+		} else {
+			matchValuesStr += resInfo.partOfLabel
 		}
 		selectorValue = strings.Replace(selectorValue, "{{__MATCH_VALUES__}}", matchValuesStr, -1)
 	}
@@ -892,10 +909,15 @@ func setApplicationAnnotationLabels(unstructuredObj *unstructured.Unstructured, 
 		selector[MATCHLABELS] = matchLabels	
 		if nameKey == resInfo.autoCreateName { 
 			if len(resInfo.autoCreateLabelValues) == 1 {
-				matchLabels[resInfo.autoCreateLabel] = resInfo.autoCreateLabelValues[0]
+				matchLabels[resInfo.autoCreateLabel] = resInfo.autoCreateLabelValues[0]			
 			}
 		} else { //part-of
-			matchLabels[AppPartOf] = resInfo.partOfLabel
+			//if part-of label is different from original, use original value
+			if resInfo.orgPartOfLabel != resInfo.partOfLabel {
+				matchLabels[AppPartOf] = resInfo.orgPartOfLabel
+			} else {
+				matchLabels[AppPartOf] = resInfo.partOfLabel
+			}
 		}
 		
 		if logger.IsEnabled(LogTypeDebug) {
@@ -920,10 +942,15 @@ func setApplicationAnnotationLabels(unstructuredObj *unstructured.Unstructured, 
 		values := make([]interface{}, 0)
 		if nameKey == resInfo.autoCreateName {
 			for _, val := range resInfo.autoCreateLabelValues {
-				values = append(values, val)
+				values = append(values, val) 
 			}
 		} else {
-			values = append(values, resInfo.partOfLabel)
+			//if part-of label is different from original, use original value
+			if resInfo.orgPartOfLabel != resInfo.partOfLabel {
+				values = append(values, resInfo.orgPartOfLabel) 
+			} else {
+				values = append(values, resInfo.partOfLabel) 
+			}
 		} 
 		expression[VALUES] = values
 		if logger.IsEnabled(LogTypeDebug) {
