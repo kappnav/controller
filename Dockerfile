@@ -14,7 +14,7 @@
 
 # Production build dockerfile
 # Stage 1: build using golang image
-FROM golang as builder
+FROM golang:1.15 as builder
 
 WORKDIR $GOPATH/src/github.com/kappnav/controller
 
